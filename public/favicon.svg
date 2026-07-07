@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <!-- Dark background circle -->
+  <circle cx="32" cy="32" r="32" fill="#221026"/>
+  <!-- Gold halo glow -->
+  <circle cx="32" cy="32" r="26" fill="none" stroke="#D4AF37" stroke-width="1.5" opacity="0.4"/>
+  <!-- Russian Orthodox Cross in gold — mastered proportions:
+       viewBox 0 0 48 64 scaled to fit in 64x64 with padding -->
+  <!-- Scale factor: cross is 48 wide, 64 tall. We want it ~36x48 centred in 64x64 -->
+  <!-- Offset: x=(64-36)/2=14, y=(64-48)/2=8. Scale=36/48=0.75 -->
+  <g transform="translate(14, 8) scale(0.75)" fill="#D4AF37">
+    <!-- Vertical bar -->
+    <rect x="21" y="0" width="6" height="62"/>
+    <!-- Top titulus bar -->
+    <rect x="14" y="6" width="20" height="5"/>
+    <!-- Main crossbar -->
+    <rect x="0" y="19" width="48" height="6"/>
+    <!-- Slanted footrest -->
+    <rect x="12" y="44" width="24" height="6" transform="rotate(-12 24 47)"/>
+  </g>
+</svg>

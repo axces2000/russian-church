@@ -1,0 +1,41 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Public can read sections and pages
+    match /sections/{sectionId} {
+      allow read: if true;
+      allow write: if request.auth != null && isAdmin();
+    }
+
+    match /pages/{pageId} {
+      allow read: if true;
+      allow write: if request.auth != null && isAdmin();
+    }
+
+    // Public can read site settings (active template, phone, site name)
+    match /settings/{docId} {
+      allow read: if true;
+      allow write: if request.auth != null && isSuperAdmin();
+    }
+
+    // Admins collection — only superadmin can manage
+    match /admins/{docId} {
+      allow read: if request.auth != null && isAdmin();
+      allow write: if request.auth != null && isSuperAdmin();
+    }
+
+    // Temporary test document — REMOVE before go-live
+    match /_test/{docId} {
+      allow read, write: if true;
+    }
+
+    function isAdmin() {
+      return exists(/databases/$(database)/documents/admins/$(request.auth.uid));
+    }
+
+    function isSuperAdmin() {
+      return get(/databases/$(database)/documents/admins/$(request.auth.uid)).data.role == 'superadmin';
+    }
+  }
+}

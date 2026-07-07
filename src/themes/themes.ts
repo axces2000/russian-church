@@ -1,0 +1,186 @@
+// src/themes/themes.ts
+// One entry per design template.
+// Each theme maps CSS variable names to values.
+// ThemeProvider applies the active theme's variables to :root.
+
+export interface Theme {
+  id: string;
+  name: string;
+  vars: Record<string, string>;
+}
+
+const themes: Theme[] = [
+  {
+    id: 'gilded-iconostasis',
+    name: 'Gilded Iconostasis',
+    vars: {
+      '--color-bg':         '#F8F1E2',
+      '--color-surface':    '#ffffff',
+      '--color-primary':    '#5C1A1E',
+      '--color-primary-dk': '#34100F',
+      '--color-accent':     '#C9A227',
+      '--color-accent-lt':  '#EBD9A0',
+      '--color-text':       '#2B1812',
+      '--color-muted':      '#5a4a3d',
+      '--font-display':     "'Cormorant Garamond', serif",
+      '--font-body':        "'EB Garamond', serif",
+      '--font-display-src': "https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&family=EB+Garamond:ital,wght@0,400;0,500;0,700;1,400&display=swap",
+    },
+  },
+  {
+    id: 'paschal-fire',
+    name: 'Paschal Fire',
+    vars: {
+      '--color-bg':         '#FFFBF2',
+      '--color-surface':    '#ffffff',
+      '--color-primary':    '#A8201A',
+      '--color-primary-dk': '#7A1410',
+      '--color-accent':     '#D4A82E',
+      '--color-accent-lt':  '#F0D27A',
+      '--color-text':       '#2A1410',
+      '--color-muted':      '#7A6A57',
+      '--font-display':     "'Playfair Display', serif",
+      '--font-body':        "'EB Garamond', serif",
+      '--font-display-src': "https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;800&family=EB+Garamond:ital,wght@0,400;0,500;0,700;1,400&display=swap",
+    },
+  },
+  {
+    id: 'candlelight-beeswax',
+    name: 'Candlelight & Beeswax',
+    vars: {
+      '--color-bg':         '#FBF1DF',
+      '--color-surface':    '#ffffff',
+      '--color-primary':    '#43290F',
+      '--color-primary-dk': '#241509',
+      '--color-accent':     '#D98F2B',
+      '--color-accent-lt':  '#F2C572',
+      '--color-text':       '#3A2A1C',
+      '--color-muted':      '#6b563a',
+      '--font-display':     "'Playfair Display', serif",
+      '--font-body':        "'Lora', serif",
+      '--font-display-src': "https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;800&family=Lora:ital,wght@0,400;0,500;1,400&display=swap",
+    },
+  },
+  {
+    id: 'cathedral-gold',
+    name: 'Cathedral Gold',
+    vars: {
+      '--color-bg':         '#F8F2E3',
+      '--color-surface':    '#ffffff',
+      '--color-primary':    '#1B1330',
+      '--color-primary-dk': '#0D0A1A',
+      '--color-accent':     '#C9A227',
+      '--color-accent-lt':  '#F0DDA0',
+      '--color-text':       '#241B12',
+      '--color-muted':      '#5b5240',
+      '--font-display':     "'Spectral', serif",
+      '--font-body':        "'Spectral', serif",
+      '--font-display-src': "https://fonts.googleapis.com/css2?family=Spectral:ital,wght@0,400;0,500;0,700;1,400&display=swap",
+    },
+  },
+  {
+    id: 'stone-and-sea',
+    name: 'Stone & Psalm of the Sea',
+    vars: {
+      '--color-bg':         '#EFE9DA',
+      '--color-surface':    '#ffffff',
+      '--color-primary':    '#101B36',
+      '--color-primary-dk': '#0A1020',
+      '--color-accent':     '#C9A227',
+      '--color-accent-lt':  '#E9D6A0',
+      '--color-text':       '#21261F',
+      '--color-muted':      '#5C5947',
+      '--font-display':     "'Source Serif 4', serif",
+      '--font-body':        "'Source Serif 4', serif",
+      '--font-display-src': "https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,wght@0,400;0,500;0,700;1,400&display=swap",
+    },
+  },
+  {
+    id: 'illuminated-gospel',
+    name: 'Illuminated Gospel',
+    vars: {
+      '--color-bg':         '#F2E8CE',
+      '--color-surface':    '#EDE3C4',
+      '--color-primary':    '#1E3A6E',
+      '--color-primary-dk': '#152850',
+      '--color-accent':     '#AD8434',
+      '--color-accent-lt':  '#D4B46A',
+      '--color-text':       '#2B2316',
+      '--color-muted':      '#5c5135',
+      '--font-display':     "'Source Serif 4', serif",
+      '--font-body':        "'Source Serif 4', serif",
+      '--font-display-src': "https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,wght@0,400;0,500;0,700;1,400;1,600&display=swap",
+    },
+  },
+  {
+    id: 'slavic-rope-gold',
+    name: 'Slavic Rope & Gold',
+    vars: {
+      '--color-bg':         '#FBF3E3',
+      '--color-surface':    '#ffffff',
+      '--color-primary':    '#241A17',
+      '--color-primary-dk': '#160F0D',
+      '--color-accent':     '#D7A93B',
+      '--color-accent-lt':  '#EDD080',
+      '--color-text':       '#3A2A22',
+      '--color-muted':      '#6b5746',
+      '--font-display':     "'Cormorant', serif",
+      '--font-body':        "'EB Garamond', serif",
+      '--font-display-src': "https://fonts.googleapis.com/css2?family=Cormorant:wght@600;700&family=EB+Garamond:ital,wght@0,400;0,500;0,700;1,400&display=swap",
+    },
+  },
+  {
+    id: 'amber-vigil',
+    name: 'Amber Vigil',
+    vars: {
+      '--color-bg':         '#EBE3D3',
+      '--color-surface':    '#F5EFE2',
+      '--color-primary':    '#3B1F0E',
+      '--color-primary-dk': '#241208',
+      '--color-accent':     '#C9963C',
+      '--color-accent-lt':  '#EAD9A8',
+      '--color-text':       '#3B2710',
+      '--color-muted':      '#6B5530',
+      '--font-display':     "'EB Garamond', serif",
+      '--font-body':        "'EB Garamond', serif",
+      '--font-display-src': "https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,500;0,700;1,400&display=swap",
+    },
+  },
+  {
+    id: 'veil-of-theotokos',
+    name: 'Veil of the Theotokos',
+    vars: {
+      '--color-bg':         '#F7F3E6',
+      '--color-surface':    '#ffffff',
+      '--color-primary':    '#283A56',
+      '--color-primary-dk': '#1A2538',
+      '--color-accent':     '#C9A227',
+      '--color-accent-lt':  '#E8D8A0',
+      '--color-text':       '#332C20',
+      '--color-muted':      '#7C7460',
+      '--font-display':     "'Cormorant Garamond', serif",
+      '--font-body':        "'EB Garamond', serif",
+      '--font-display-src': "https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;1,500&family=EB+Garamond:ital,wght@0,400;0,500;0,700;1,400&display=swap",
+    },
+  },
+  {
+    id: 'hagia-sophia-gold',
+    name: 'Hagia Sophia Gold',
+    vars: {
+      '--color-bg':         '#EFEAE0',
+      '--color-surface':    '#ffffff',
+      '--color-primary':    '#221026',
+      '--color-primary-dk': '#120816',
+      '--color-accent':     '#D4AF37',
+      '--color-accent-lt':  '#F0DDA0',
+      '--color-text':       '#251C13',
+      '--color-muted':      '#7a6f54',
+      '--font-display':     "'EB Garamond', serif",
+      '--font-body':        "'EB Garamond', serif",
+      '--font-display-src': "https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,500;0,700;1,400&display=swap",
+    },
+  },
+];
+
+export default themes;
+export const DEFAULT_THEME_ID = 'hagia-sophia-gold';

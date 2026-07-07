@@ -1,0 +1,22 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    // Public can read all files (images displayed on the site)
+    match /{allPaths=**} {
+      allow read: if true;
+      allow write: if request.auth != null
+        && isAdmin()
+        && request.resource.size < 20 * 1024 * 1024  // max 20 MB
+        && (
+          request.resource.contentType.matches('image/.*') ||
+          request.resource.contentType.matches('video/.*') ||
+          request.resource.contentType == 'application/pdf'
+        );
+    }
+
+    function isAdmin() {
+      return firestore.exists(/databases/(default)/documents/admins/$(request.auth.uid));
+    }
+  }
+}
