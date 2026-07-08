@@ -162,12 +162,20 @@ export default function SiteLayout({ children }: SiteLayoutProps) {
             </div>
             <p style={{ margin: 0, fontSize: 13.5 }}>62 Darlington Road, Miramar, Wellington 6022</p>
           </div>
-          <div>
-            <div style={{ color: '#fff', fontSize: 13, letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 10 }}>
-              {lang === 'en' ? 'Contact' : 'Контакты'}
-            </div>
-            {settings?.phone && <p style={{ margin: 0, fontSize: 13.5 }}>{settings.phone}</p>}
-          </div>
+<div>
+  <div style={{ color: '#fff', fontSize: 13, letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 10 }}>
+    {lang === 'en' ? 'Contact' : 'Контакты'}
+  </div>
+  {(settings?.contactNameEn || settings?.contactNameRu) ? (
+    <p style={{ margin: 0, fontSize: 13.5 }}>
+      {lang === 'en'
+        ? (settings.contactNameEn || settings.contactNameRu)
+        : (settings.contactNameRu || settings.contactNameEn)}
+    </p>
+  ) : (
+    settings?.phone && <p style={{ margin: 0, fontSize: 13.5 }}>{settings.phone}</p>
+  )}
+</div>
           <div>
             <div style={{ color: '#fff', fontSize: 13, letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 10 }}>
               {lang === 'en' ? 'Diocese' : 'Епархия'}

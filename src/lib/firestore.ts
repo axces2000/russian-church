@@ -45,6 +45,15 @@ export interface AdminRecord {
   sections: string[] | 'all';
 }
 
+export interface SiteSettings {
+  activeTemplate: string;
+  phone: string;
+  siteName: string;
+  siteNameRu: string;
+  contactNameEn: string;   // ← add
+  contactNameRu: string;   // ← add
+}
+
 // ─── Settings ─────────────────────────────────────────────────────────────────
 
 export async function getSiteSettings(): Promise<SiteSettings | null> {
@@ -155,3 +164,4 @@ export async function saveAdmin(admin: AdminRecord) {
 export async function deleteAdmin(uid: string) {
   await deleteDoc(doc(db, 'admins', uid));
 }
+

@@ -1,24 +1,29 @@
 // src/admin/SiteSettings.tsx
-// Superadmin can edit site name (EN and RU) and phone number here.
+// Superadmin can edit site name (EN and RU), contact name (EN and RU),
+// and phone number here.
 
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { getSiteSettings, updateSiteSettings } from '../lib/firestore';
 
 export default function SiteSettings() {
-  const [siteName, setSiteName]     = useState('');
-  const [siteNameRu, setSiteNameRu] = useState('');
-  const [phone, setPhone]           = useState('');
-  const [loading, setLoading]       = useState(true);
-  const [saving, setSaving]         = useState(false);
-  const [saved, setSaved]           = useState(false);
-  const [error, setError]           = useState('');
+  const [siteName, setSiteName]           = useState('');
+  const [siteNameRu, setSiteNameRu]       = useState('');
+  const [contactNameEn, setContactNameEn] = useState('');
+  const [contactNameRu, setContactNameRu] = useState('');
+  const [phone, setPhone]                 = useState('');
+  const [loading, setLoading]             = useState(true);
+  const [saving, setSaving]               = useState(false);
+  const [saved, setSaved]                 = useState(false);
+  const [error, setError]                 = useState('');
 
   useEffect(() => {
     getSiteSettings().then(s => {
       if (s) {
         setSiteName(s.siteName ?? '');
-        setSiteNameRu((s as any).siteNameRu ?? '');
+        setSiteNameRu(s.siteNameRu ?? '');
+        setContactNameEn(s.contactNameEn ?? '');
+        setContactNameRu(s.contactNameRu ?? '');
         setPhone(s.phone ?? '');
       }
       setLoading(false);
@@ -29,7 +34,7 @@ export default function SiteSettings() {
     setSaving(true);
     setError('');
     try {
-      await updateSiteSettings({ siteName, siteNameRu, phone } as any);
+      await updateSiteSettings({ siteName, siteNameRu, contactNameEn, contactNameRu, phone });
       setSaved(true);
       setTimeout(() => setSaved(false), 2500);
     } catch (e: any) {
@@ -59,10 +64,27 @@ export default function SiteSettings() {
           <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
 
             <Field label="Site Name (English)" value={siteName} onChange={setSiteName} />
-
             <Field label="Site Name (Russian / Русское название)" value={siteNameRu} onChange={setSiteNameRu} />
 
-            <Field label="Phone Number (displayed in footer)" value={phone} onChange={setPhone} placeholder="+64 …" />
+            <Divider label="Contact person" />
+            <Field
+              label="Contact Name (English)"
+              value={contactNameEn}
+              onChange={setContactNameEn}
+              placeholder="e.g. Alexei"
+            />
+            <Field
+              label="Contact Name (Russian / Имя на русском)"
+              value={contactNameRu}
+              onChange={setContactNameRu}
+              placeholder="e.g. Алексей"
+            />
+            <Field
+              label="Phone Number (displayed in footer)"
+              value={phone}
+              onChange={setPhone}
+              placeholder="+64 …"
+            />
 
           </div>
 
@@ -83,6 +105,16 @@ export default function SiteSettings() {
           </div>
         </div>
       </div>
+    </div>
+  );
+}
+
+function Divider({ label }: { label: string }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 10, margin: '4px 0 0' }}>
+      <div style={{ flex: 1, height: 1, background: '#e0dbd0' }} />
+      <span style={{ fontSize: 11, color: '#aaa', letterSpacing: '0.06em', textTransform: 'uppercase' }}>{label}</span>
+      <div style={{ flex: 1, height: 1, background: '#e0dbd0' }} />
     </div>
   );
 }
