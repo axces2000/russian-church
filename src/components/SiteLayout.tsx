@@ -154,7 +154,7 @@ export default function SiteLayout({ children }: SiteLayoutProps) {
       <main>{children}</main>
 
       {/* ── Footer ── */}
-      <footer style={{ background: 'var(--color-primary-dk)', color: 'var(--color-accent-lt)', padding: '40px 24px 24px', marginTop: 60 }}>
+      <footer style={{ background: 'var(--color-primary-dk)', color: 'var(--color-accent-lt)', padding: '40px 24px 24px', marginTop: 28 }}>
         <div style={{ maxWidth: 1180, margin: '0 auto', display: 'flex', flexWrap: 'wrap', gap: 32, justifyContent: 'space-between' }}>
           <div>
             <div style={{ color: '#fff', fontSize: 13, letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 10 }}>

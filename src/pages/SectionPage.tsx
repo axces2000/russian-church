@@ -43,7 +43,7 @@ export default function SectionPage() {
   const multiPage = pages.length > 1;
 
   return (
-    <div style={{ maxWidth: 960, margin: '0 auto', padding: '48px 24px 80px' }}>
+    <div style={{ maxWidth: 960, margin: '0 auto', padding: '28px 24px 40px' }}>
 
       {/* Section heading */}
       <h1 style={{
