@@ -16,6 +16,7 @@ import PageEditor        from './admin/PageEditor';
 import TemplateSwitcher  from './admin/TemplateSwitcher';
 import SiteSettings      from './admin/SiteSettings';
 import AdminUsers        from './admin/AdminUsers';
+import CalendarAdmin     from './admin/CalendarAdmin';
 
 export default function App() {
   return (
@@ -57,6 +58,12 @@ export default function App() {
               <Route path="/admin/content/edit/:pageId" element={
                 <AuthGuard>
                   <PageEditor />
+                </AuthGuard>
+              } />
+
+              <Route path="/admin/calendar" element={
+                <AuthGuard>
+                  <CalendarAdmin />
                 </AuthGuard>
               } />
 

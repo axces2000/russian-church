@@ -1,6 +1,5 @@
 // src/admin/AdminDashboard.tsx
 
-//import React from 'react';
 import { Link } from 'react-router-dom';
 import { signOut } from 'firebase/auth';
 import { auth } from '../lib/firebase';
@@ -60,6 +59,14 @@ export default function AdminDashboard() {
             description="Edit pages and sections"
             to="/admin/content"
             icon="📄"
+          />
+
+          {/* Service schedule — all admins */}
+          <AdminCard
+            title="Service Schedule"
+            description="Edit service times and manage templates"
+            to="/admin/calendar"
+            icon="📅"
           />
 
           {/* Template switcher — superadmin only */}

@@ -3,8 +3,8 @@
 
 import {
   collection, doc, getDoc, getDocs, setDoc,
-  deleteDoc, onSnapshot, query, orderBy, writeBatch,
-  serverTimestamp,
+  deleteDoc, onSnapshot, query, orderBy, where,
+  writeBatch, serverTimestamp,
 } from 'firebase/firestore';
 import type { Unsubscribe } from 'firebase/firestore';
 import { db } from './firebase';
@@ -36,6 +36,8 @@ export interface SiteSettings {
   phone: string;
   siteName: string;
   siteNameRu: string;
+  contactNameEn: string;
+  contactNameRu: string;
 }
 
 export interface AdminRecord {
@@ -45,13 +47,25 @@ export interface AdminRecord {
   sections: string[] | 'all';
 }
 
-export interface SiteSettings {
-  activeTemplate: string;
-  phone: string;
-  siteName: string;
-  siteNameRu: string;
-  contactNameEn: string;   // ← add
-  contactNameRu: string;   // ← add
+// ─── Service Events ───────────────────────────────────────────────────────────
+
+export interface ServiceEvent {
+  date: string;       // "YYYY-MM-DD" — also the document ID
+  yearMonth: string;  // "YYYY-MM" — used for month queries
+  entriesEn: string;  // plain text, newline-separated
+  entriesRu: string;
+  updatedAt: any;
+}
+
+// ─── Service Templates ────────────────────────────────────────────────────────
+
+export interface ServiceTemplate {
+  id: string;
+  nameEn: string;
+  nameRu: string;
+  entriesEn: string;
+  entriesRu: string;
+  order: number;
 }
 
 // ─── Settings ─────────────────────────────────────────────────────────────────
@@ -165,3 +179,65 @@ export async function deleteAdmin(uid: string) {
   await deleteDoc(doc(db, 'admins', uid));
 }
 
+// ─── Service Events ───────────────────────────────────────────────────────────
+
+export async function getServiceEvent(dateStr: string): Promise<ServiceEvent | null> {
+  const snap = await getDoc(doc(db, 'serviceEvents', dateStr));
+  return snap.exists() ? { date: snap.id, ...snap.data() } as ServiceEvent : null;
+}
+
+export async function saveServiceEvent(event: Omit<ServiceEvent, 'updatedAt'>) {
+  await setDoc(doc(db, 'serviceEvents', event.date), {
+    ...event,
+    updatedAt: serverTimestamp(),
+  }, { merge: true });
+}
+
+export async function deleteServiceEvent(dateStr: string) {
+  await deleteDoc(doc(db, 'serviceEvents', dateStr));
+}
+
+export function subscribeServiceEventsForMonth(
+  year: number,
+  month: number,
+  cb: (events: Record<string, ServiceEvent>) => void
+): Unsubscribe {
+  const ym = `${year}-${String(month + 1).padStart(2, '0')}`;
+  return onSnapshot(
+    query(collection(db, 'serviceEvents'), where('yearMonth', '==', ym)),
+    snap => {
+      const result: Record<string, ServiceEvent> = {};
+      snap.docs.forEach(d => {
+        result[d.id] = { date: d.id, ...d.data() } as ServiceEvent;
+      });
+      cb(result);
+    }
+  );
+}
+
+// ─── Service Templates ────────────────────────────────────────────────────────
+
+export function subscribeServiceTemplates(
+  cb: (templates: ServiceTemplate[]) => void
+): Unsubscribe {
+  return onSnapshot(
+    query(collection(db, 'serviceTemplates'), orderBy('order')),
+    snap => cb(snap.docs.map(d => ({ id: d.id, ...d.data() } as ServiceTemplate)))
+  );
+}
+
+export async function saveServiceTemplate(template: ServiceTemplate) {
+  await setDoc(doc(db, 'serviceTemplates', template.id), template, { merge: true });
+}
+
+export async function deleteServiceTemplate(id: string) {
+  await deleteDoc(doc(db, 'serviceTemplates', id));
+}
+
+export async function reorderServiceTemplates(templates: ServiceTemplate[]) {
+  const batch = writeBatch(db);
+  templates.forEach((t, i) => {
+    batch.update(doc(db, 'serviceTemplates', t.id), { order: i });
+  });
+  await batch.commit();
+}

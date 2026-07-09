@@ -1,5 +1,6 @@
 // src/pages/SectionPage.tsx
 // Renders a single section and all its pages.
+// For the 'services' section, the ServiceCalendar is shown above page content.
 // If the section has more than one page, shows anchor links at the top.
 
 import { useEffect, useState } from 'react';
@@ -7,6 +8,7 @@ import { useParams, Navigate } from 'react-router-dom';
 import { useLang } from '../contexts/LangContext';
 import { subscribeSections, subscribePages } from '../lib/firestore';
 import type { Section, Page } from '../lib/firestore';
+import ServiceCalendar from '../components/ServiceCalendar';
 
 export default function SectionPage() {
   const { slug } = useParams<{ slug: string }>();
@@ -43,7 +45,7 @@ export default function SectionPage() {
   const multiPage = pages.length > 1;
 
   return (
-    <div style={{ maxWidth: 960, margin: '0 auto', padding: '28px 24px 40px' }}>
+    <div style={{ maxWidth: 960, margin: '0 auto', padding: '48px 24px 80px' }}>
 
       {/* Section heading */}
       <h1 style={{
@@ -53,12 +55,17 @@ export default function SectionPage() {
         letterSpacing: '0.03em',
         textTransform: 'uppercase',
         color: 'var(--color-primary)',
-        marginBottom: multiPage ? 16 : 32,
+        marginBottom: 32,
         borderBottom: '2px solid var(--color-accent)',
         paddingBottom: 14,
       }}>
         {sectionTitle}
       </h1>
+
+      {/* ── Service Calendar — shown only on the Services section ── */}
+      {section.slug === 'services' && (
+        <ServiceCalendar />
+      )}
 
       {/* Anchor links — only when more than one page */}
       {multiPage && (
