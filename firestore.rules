@@ -31,8 +31,14 @@ service cloud.firestore {
       allow write: if request.auth != null && isAdmin();
     }
 
-    // Service templates — public read, any admin can write
+    // Full-day reusable templates — public read, any admin can write
     match /serviceTemplates/{templateId} {
+      allow read: if true;
+      allow write: if request.auth != null && isAdmin();
+    }
+
+    // Individual reusable entry lines — public read, any admin can write
+    match /serviceEntryTypes/{entryId} {
       allow read: if true;
       allow write: if request.auth != null && isAdmin();
     }

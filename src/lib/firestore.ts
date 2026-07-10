@@ -58,6 +58,7 @@ export interface ServiceEvent {
 }
 
 // ─── Service Templates ────────────────────────────────────────────────────────
+// Full-day schedules applied in one click.
 
 export interface ServiceTemplate {
   id: string;
@@ -65,6 +66,16 @@ export interface ServiceTemplate {
   nameRu: string;
   entriesEn: string;
   entriesRu: string;
+  order: number;
+}
+
+// ─── Service Entry Types ──────────────────────────────────────────────────────
+// Individual reusable lines appended to a day's schedule.
+
+export interface ServiceEntryType {
+  id: string;
+  textEn: string;   // e.g. "10:00 Prayer service (Obednitsa)"
+  textRu: string;   // e.g. "10:00 Обедница"
   order: number;
 }
 
@@ -238,6 +249,33 @@ export async function reorderServiceTemplates(templates: ServiceTemplate[]) {
   const batch = writeBatch(db);
   templates.forEach((t, i) => {
     batch.update(doc(db, 'serviceTemplates', t.id), { order: i });
+  });
+  await batch.commit();
+}
+
+// ─── Service Entry Types ──────────────────────────────────────────────────────
+
+export function subscribeServiceEntryTypes(
+  cb: (entries: ServiceEntryType[]) => void
+): Unsubscribe {
+  return onSnapshot(
+    query(collection(db, 'serviceEntryTypes'), orderBy('order')),
+    snap => cb(snap.docs.map(d => ({ id: d.id, ...d.data() } as ServiceEntryType)))
+  );
+}
+
+export async function saveServiceEntryType(entry: ServiceEntryType) {
+  await setDoc(doc(db, 'serviceEntryTypes', entry.id), entry, { merge: true });
+}
+
+export async function deleteServiceEntryType(id: string) {
+  await deleteDoc(doc(db, 'serviceEntryTypes', id));
+}
+
+export async function reorderServiceEntryTypes(entries: ServiceEntryType[]) {
+  const batch = writeBatch(db);
+  entries.forEach((e, i) => {
+    batch.update(doc(db, 'serviceEntryTypes', e.id), { order: i });
   });
   await batch.commit();
 }
