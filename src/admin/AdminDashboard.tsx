@@ -38,10 +38,14 @@ export default function AdminDashboard() {
         <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(200px, 1fr))', gap:16 }}>
           <AdminCard title="Content" description="Edit pages and sections"
             to="/admin/content" icon="📄" />
-          <AdminCard title="Service Schedule" description="Edit service times and manage templates"
-            to="/admin/calendar" icon="📅" />
-          <AdminCard title="Sunday School" description="Edit lesson schedules and templates"
-            to="/admin/sunday-school" icon="🏫" />
+          {(role === 'superadmin' || (Array.isArray(allowedSections) && allowedSections.includes('services'))) && (
+            <AdminCard title="Service Schedule" description="Edit service times and manage templates"
+              to="/admin/calendar" icon="📅" />
+          )}
+          {(role === 'superadmin' || (Array.isArray(allowedSections) && allowedSections.includes('sunday-school'))) && (
+            <AdminCard title="Sunday School" description="Edit lesson schedules and templates"
+              to="/admin/sunday-school" icon="🏫" />
+          )}
           {role === 'superadmin' && (
             <AdminCard title="Design Template" description="Switch the site's visual theme"
               to="/admin/template" icon="🎨" />

@@ -49,10 +49,10 @@ export default function App() {
                 <AuthGuard><PageEditor /></AuthGuard>
               } />
               <Route path="/admin/calendar" element={
-                <AuthGuard><CalendarAdmin /></AuthGuard>
+                <AuthGuard requireSection="services"><CalendarAdmin /></AuthGuard>
               } />
               <Route path="/admin/sunday-school" element={
-                <AuthGuard><SundaySchoolAdmin /></AuthGuard>
+                <AuthGuard requireSection="sunday-school"><SundaySchoolAdmin /></AuthGuard>
               } />
 
               {/* Superadmin only */}

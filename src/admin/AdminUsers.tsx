@@ -87,6 +87,50 @@ export default function AdminUsers() {
     }
   };
 
+  // Edit-in-place state
+  const [editingUid, setEditingUid]     = useState<string | null>(null);
+  const [editRole, setEditRole]         = useState<'admin' | 'superadmin'>('admin');
+  const [editSections, setEditSections] = useState<string[]>([]);
+  const [editSaving, setEditSaving]     = useState(false);
+  const [editError, setEditError]       = useState('');
+
+  const startEdit = (admin: AdminRecord) => {
+    setEditingUid(admin.uid);
+    setEditRole(admin.role === 'superadmin' ? 'superadmin' : 'admin');
+    setEditSections(Array.isArray(admin.sections) ? admin.sections : []);
+    setEditError('');
+  };
+
+  const cancelEdit = () => {
+    setEditingUid(null);
+    setEditError('');
+  };
+
+  const toggleEditSection = (id: string) => {
+    setEditSections(prev =>
+      prev.includes(id) ? prev.filter(s => s !== id) : [...prev, id]
+    );
+  };
+
+  const saveEdit = async (admin: AdminRecord) => {
+    setEditSaving(true);
+    setEditError('');
+    try {
+      await saveAdmin({
+        uid: admin.uid,
+        email: admin.email,
+        role: editRole,
+        sections: editRole === 'superadmin' ? 'all' : editSections,
+      });
+      setEditingUid(null);
+      await refresh();
+    } catch (e: any) {
+      setEditError(e.message);
+    } finally {
+      setEditSaving(false);
+    }
+  };
+
   const handleDelete = async (admin: AdminRecord) => {
     if (!window.confirm(`Remove admin access for ${admin.email}? (Firebase Auth account is kept.)`)) return;
     await deleteAdmin(admin.uid);
@@ -121,36 +165,96 @@ export default function AdminUsers() {
             <p style={{ padding: '20px 24px', color: '#aaa', margin: 0 }}>No admins yet.</p>
           )}
           {admins.map(admin => (
-            <div key={admin.uid} style={{
-              padding: '14px 20px', borderBottom: '1px solid #f0ede6',
-              display: 'flex', alignItems: 'center', gap: 12,
-            }}>
-              <div style={{ flex: 1 }}>
-                <div style={{ fontWeight: 600, fontSize: 14 }}>{admin.email}</div>
-                <div style={{ fontSize: 12, color: '#888', marginTop: 2 }}>
-                  Sections: {
-                    admin.sections === 'all'
-                      ? 'All sections'
-                      : Array.isArray(admin.sections) && admin.sections.length > 0
-                        ? admin.sections.join(', ')
-                        : 'None assigned'
-                  }
-                </div>
-              </div>
-              <span style={{
-                fontSize: 11, padding: '2px 10px', borderRadius: 999,
-                background: admin.role === 'superadmin' ? '#d4af37' : '#e8e3dc',
-                color: admin.role === 'superadmin' ? '#2c1a3e' : '#666',
-                fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em',
+            <div key={admin.uid} style={{ borderBottom: '1px solid #f0ede6' }}>
+              <div style={{
+                padding: '14px 20px',
+                display: 'flex', alignItems: 'center', gap: 12,
               }}>
-                {admin.role}
-              </span>
-              <button
-                onClick={() => handleDelete(admin)}
-                style={{ padding: '5px 12px', border: '1px solid #e74c3c', borderRadius: 4, background: '#fff', color: '#e74c3c', fontSize: 12, cursor: 'pointer' }}
-              >
-                Remove
-              </button>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontWeight: 600, fontSize: 14 }}>{admin.email}</div>
+                  <div style={{ fontSize: 12, color: '#888', marginTop: 2 }}>
+                    Sections: {
+                      admin.sections === 'all'
+                        ? 'All sections'
+                        : Array.isArray(admin.sections) && admin.sections.length > 0
+                          ? admin.sections.join(', ')
+                          : 'None assigned'
+                    }
+                  </div>
+                </div>
+                <span style={{
+                  fontSize: 11, padding: '2px 10px', borderRadius: 999,
+                  background: admin.role === 'superadmin' ? '#d4af37' : '#e8e3dc',
+                  color: admin.role === 'superadmin' ? '#2c1a3e' : '#666',
+                  fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em',
+                }}>
+                  {admin.role}
+                </span>
+                <button
+                  onClick={() => editingUid === admin.uid ? cancelEdit() : startEdit(admin)}
+                  style={{ padding: '5px 12px', border: '1px solid #ddd', borderRadius: 4, background: '#fff', color: '#2c1a3e', fontSize: 12, cursor: 'pointer' }}
+                >
+                  {editingUid === admin.uid ? 'Cancel' : 'Edit'}
+                </button>
+                <button
+                  onClick={() => handleDelete(admin)}
+                  style={{ padding: '5px 12px', border: '1px solid #e74c3c', borderRadius: 4, background: '#fff', color: '#e74c3c', fontSize: 12, cursor: 'pointer' }}
+                >
+                  Remove
+                </button>
+              </div>
+
+              {/* Inline edit form */}
+              {editingUid === admin.uid && (
+                <div style={{ padding: '0 20px 20px', background: '#f9f7f3' }}>
+                  <div style={{ marginBottom: 14 }}>
+                    <label style={{ fontSize: 12, fontWeight: 600, color: '#444', display: 'block', marginBottom: 6 }}>Role</label>
+                    <select
+                      value={editRole}
+                      onChange={e => setEditRole(e.target.value as 'admin' | 'superadmin')}
+                      style={{ padding: '7px 10px', border: '1px solid #ddd', borderRadius: 4, fontSize: 13, fontFamily: 'system-ui', width: 200 }}
+                    >
+                      <option value="admin">Admin (delegated)</option>
+                      <option value="superadmin">Superadmin (full access)</option>
+                    </select>
+                  </div>
+
+                  {editRole === 'admin' && (
+                    <div style={{ marginBottom: 14 }}>
+                      <label style={{ fontSize: 12, fontWeight: 600, color: '#444', display: 'block', marginBottom: 8 }}>
+                        Allowed Sections
+                      </label>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                        {sections.map(sec => (
+                          <label key={sec.id} style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 13, cursor: 'pointer' }}>
+                            <input
+                              type="checkbox"
+                              checked={editSections.includes(sec.id)}
+                              onChange={() => toggleEditSection(sec.id)}
+                            />
+                            {sec.nameEn}
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                    <button
+                      onClick={() => saveEdit(admin)}
+                      disabled={editSaving}
+                      style={{
+                        padding: '8px 20px', background: '#2c1a3e', color: '#fff',
+                        border: 'none', borderRadius: 4, fontWeight: 600, fontSize: 13,
+                        cursor: editSaving ? 'not-allowed' : 'pointer', opacity: editSaving ? 0.7 : 1,
+                      }}
+                    >
+                      {editSaving ? 'Saving…' : 'Save Changes'}
+                    </button>
+                    {editError && <span style={{ fontSize: 13, color: '#e74c3c' }}>{editError}</span>}
+                  </div>
+                </div>
+              )}
             </div>
           ))}
         </div>
