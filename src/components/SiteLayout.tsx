@@ -19,7 +19,7 @@ function OrthodoxCross({ size = 28, color = 'var(--color-accent)' }: { size?: nu
         <rect x="21" y="0" width="6" height="62" />
         <rect x="14" y="6" width="20" height="5" />
         <rect x="0" y="19" width="48" height="6" />
-        <rect x="12" y="44" width="24" height="6" transform="rotate(-12 24 47)" />
+        <rect x="12" y="44" width="24" height="6" transform="rotate(12 24 47)" />
       </g>
     </svg>
   );
@@ -77,7 +77,7 @@ export default function SiteLayout({ children }: SiteLayoutProps) {
           </div>
 
           {/* Language switch + mobile menu toggle — right */}
-          <div className="header-actions" style={{ display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0 }}>
             <LangToggle />
             <button
               className="mobile-menu-toggle"
@@ -107,7 +107,7 @@ export default function SiteLayout({ children }: SiteLayoutProps) {
             borderTop: '1px solid rgba(255,255,255,0.1)',
           }}
         >
-          <div className="desktop-nav-links" style={{
+          <div style={{
             maxWidth: 1180, margin: '0 auto',
             display: 'flex', justifyContent: 'center', flexWrap: 'wrap',
           }}>
@@ -132,10 +132,9 @@ export default function SiteLayout({ children }: SiteLayoutProps) {
             ))}
           </div>
 
-          {/* Mobile dropdown — only ever opened via the mobile-only hamburger button,
-              so it never appears alongside the desktop nav row */}
+          {/* Mobile dropdown */}
           {menuOpen && (
-            <div className="mobile-nav-dropdown" style={{ borderTop: '1px solid rgba(255,255,255,0.1)' }}>
+            <div style={{ borderTop: '1px solid rgba(255,255,255,0.1)' }}>
               {visibleSections.map(section => (
                 <NavLink
                   key={section.id}
@@ -155,44 +154,26 @@ export default function SiteLayout({ children }: SiteLayoutProps) {
       <main>{children}</main>
 
       {/* ── Footer ── */}
-      <footer style={{ background: 'var(--color-primary-dk)', color: 'var(--color-accent-lt)', padding: '40px 24px 24px', marginTop: 28 }}>
+      <footer style={{ background: 'var(--color-primary-dk)', color: 'var(--color-accent-lt)', padding: '40px 24px 24px', marginTop: 60 }}>
         <div style={{ maxWidth: 1180, margin: '0 auto', display: 'flex', flexWrap: 'wrap', gap: 32, justifyContent: 'space-between' }}>
           <div>
             <div style={{ color: '#fff', fontSize: 13, letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 10 }}>
               {lang === 'en' ? 'Visit Us' : 'Наш адрес'}
             </div>
-            <p style={{ margin: 0, fontSize: 13.5 }}>
-              <a
-                href="https://maps.app.goo.gl/F9NHkeNPLXyuhbdg6"
-                target="_blank"
-                rel="noopener noreferrer"
-                style={{ color: 'inherit', textDecoration: 'underline', textUnderlineOffset: 3 }}
-              >
-                62 Darlington Road, Miramar, Wellington 6022
-              </a>
-            </p>
+            <p style={{ margin: 0, fontSize: 13.5 }}>62 Darlington Road, Miramar, Wellington 6022</p>
           </div>
 <div>
   <div style={{ color: '#fff', fontSize: 13, letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 10 }}>
     {lang === 'en' ? 'Contact' : 'Контакты'}
   </div>
-  {(settings?.contactNameEn || settings?.contactNameRu || settings?.phone) && (
+  {(settings?.contactNameEn || settings?.contactNameRu) ? (
     <p style={{ margin: 0, fontSize: 13.5 }}>
-      {settings?.phone ? (
-        <a
-          href={`tel:${settings.phone.replace(/[^\d+]/g, '')}`}
-          style={{ color: 'inherit', textDecoration: 'underline', textUnderlineOffset: 3 }}
-        >
-          {lang === 'en'
-            ? (settings.contactNameEn || settings.contactNameRu || settings.phone)
-            : (settings.contactNameRu || settings.contactNameEn || settings.phone)}
-        </a>
-      ) : (
-        lang === 'en'
-          ? (settings.contactNameEn || settings.contactNameRu)
-          : (settings.contactNameRu || settings.contactNameEn)
-      )}
+      {lang === 'en'
+        ? (settings.contactNameEn || settings.contactNameRu)
+        : (settings.contactNameRu || settings.contactNameEn)}
     </p>
+  ) : (
+    settings?.phone && <p style={{ margin: 0, fontSize: 13.5 }}>{settings.phone}</p>
   )}
 </div>
           <div>
@@ -200,14 +181,7 @@ export default function SiteLayout({ children }: SiteLayoutProps) {
               {lang === 'en' ? 'Diocese' : 'Епархия'}
             </div>
             <p style={{ margin: 0, fontSize: 13.5 }}>
-              <a
-                href="https://rocor.org.au/"
-                target="_blank"
-                rel="noopener noreferrer"
-                style={{ color: 'inherit', textDecoration: 'underline', textUnderlineOffset: 3 }}
-              >
-                {lang === 'en' ? 'Australian & New Zealand Diocese, ROCOR' : 'Австралийско-Новозеландская епархия РПЦЗ'}
-              </a>
+              {lang === 'en' ? 'Australian & New Zealand Diocese, ROCOR' : 'Австралийско-Новозеландская епархия РПЦЗ'}
             </p>
           </div>
         </div>

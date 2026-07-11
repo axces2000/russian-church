@@ -87,7 +87,7 @@ export default function TemplateSwitcher() {
                       <rect x="21" y="0" width="6" height="62"/>
                       <rect x="14" y="6" width="20" height="5"/>
                       <rect x="0" y="19" width="48" height="6"/>
-                      <rect x="12" y="44" width="24" height="6" transform="rotate(-12 24 47)"/>
+                      <rect x="12" y="44" width="24" height="6" transform="rotate(12 24 47)"/>
                     </g>
                   </svg>
                   <span style={{
