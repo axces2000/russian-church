@@ -1,11 +1,20 @@
 // src/admin/AdminUsers.tsx
 // Superadmin can view, add, and remove admin users here.
 // Also assigns which sections each admin can edit.
+//
+// IMPORTANT: creating a new Firebase Auth user with the client SDK's
+// createUserWithEmailAndPassword() automatically signs the app in as that
+// new user, which would kick the superadmin out of their own session and
+// cause the Firestore admin-record write to fail permission checks.
+// To avoid this, we run user creation on a throwaway secondary Firebase
+// App/Auth instance, then tear it down — the main `auth` (and the
+// superadmin's session) is never touched.
 
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { createUserWithEmailAndPassword } from 'firebase/auth';
-import { auth } from '../lib/firebase';
+import { initializeApp, deleteApp } from 'firebase/app';
+import { getAuth, createUserWithEmailAndPassword } from 'firebase/auth';
+import { auth as mainAuth } from '../lib/firebase';
 import { getAdmins, saveAdmin, deleteAdmin, getSections } from '../lib/firestore';
 import type { AdminRecord, Section } from '../lib/firestore';
 
@@ -38,12 +47,20 @@ export default function AdminUsers() {
     setAdding(true);
     setAddError('');
     setAddSuccess('');
+
+    // Spin up a throwaway secondary Firebase app + auth instance so that
+    // creating the new user doesn't sign the superadmin out of the main
+    // `auth` instance (the client SDK auto-signs-in as any newly created user).
+    const secondaryApp = initializeApp(mainAuth.app.options, `secondary-${Date.now()}`);
+    const secondaryAuth = getAuth(secondaryApp);
+
     try {
-      // Create Firebase Auth account
-      const cred = await createUserWithEmailAndPassword(auth, newEmail, newPassword);
+      // Create the Firebase Auth account on the secondary instance
+      const cred = await createUserWithEmailAndPassword(secondaryAuth, newEmail, newPassword);
       const uid  = cred.user.uid;
 
-      // Save admin record
+      // Save admin record — this runs while the superadmin is still
+      // signed in on the main `auth` instance, so Firestore rules pass.
       await saveAdmin({
         uid,
         email: newEmail,
@@ -59,6 +76,13 @@ export default function AdminUsers() {
     } catch (e: any) {
       setAddError(e.message);
     } finally {
+      // Clean up the secondary instance regardless of success/failure
+      try {
+        await secondaryAuth.signOut();
+      } catch {
+        // ignore
+      }
+      await deleteApp(secondaryApp);
       setAdding(false);
     }
   };
@@ -104,7 +128,13 @@ export default function AdminUsers() {
               <div style={{ flex: 1 }}>
                 <div style={{ fontWeight: 600, fontSize: 14 }}>{admin.email}</div>
                 <div style={{ fontSize: 12, color: '#888', marginTop: 2 }}>
-                  Sections: {admin.sections === 'all' ? 'All sections' : (admin.sections as string[]).join(', ') || 'None assigned'}
+                  Sections: {
+                    admin.sections === 'all'
+                      ? 'All sections'
+                      : Array.isArray(admin.sections) && admin.sections.length > 0
+                        ? admin.sections.join(', ')
+                        : 'None assigned'
+                  }
                 </div>
               </div>
               <span style={{
