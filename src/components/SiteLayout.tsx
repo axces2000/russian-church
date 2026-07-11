@@ -77,7 +77,7 @@ export default function SiteLayout({ children }: SiteLayoutProps) {
           </div>
 
           {/* Language switch + mobile menu toggle — right */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0 }}>
+          <div className="header-actions" style={{ display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0 }}>
             <LangToggle />
             <button
               className="mobile-menu-toggle"
@@ -107,7 +107,7 @@ export default function SiteLayout({ children }: SiteLayoutProps) {
             borderTop: '1px solid rgba(255,255,255,0.1)',
           }}
         >
-          <div style={{
+          <div className="desktop-nav-links" style={{
             maxWidth: 1180, margin: '0 auto',
             display: 'flex', justifyContent: 'center', flexWrap: 'wrap',
           }}>
@@ -132,9 +132,10 @@ export default function SiteLayout({ children }: SiteLayoutProps) {
             ))}
           </div>
 
-          {/* Mobile dropdown */}
+          {/* Mobile dropdown — only ever opened via the mobile-only hamburger button,
+              so it never appears alongside the desktop nav row */}
           {menuOpen && (
-            <div style={{ borderTop: '1px solid rgba(255,255,255,0.1)' }}>
+            <div className="mobile-nav-dropdown" style={{ borderTop: '1px solid rgba(255,255,255,0.1)' }}>
               {visibleSections.map(section => (
                 <NavLink
                   key={section.id}

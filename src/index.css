@@ -81,4 +81,17 @@ h1, h2, h3, h4 {
   .mobile-menu-toggle {
     display: flex !important;
   }
+
+  /* Hide the always-on horizontal nav row on mobile —
+     the hamburger's dropdown (.mobile-nav-dropdown) replaces it. */
+  .desktop-nav-links {
+    display: none !important;
+  }
+
+  /* Stack the language switch above the hamburger to save
+     horizontal header space next to the brand text. */
+  .header-actions {
+    flex-direction: column !important;
+    gap: 6px !important;
+  }
 }
