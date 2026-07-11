@@ -2,21 +2,22 @@
 
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 
-import { LangProvider }  from './contexts/LangContext';
-import { AuthProvider }  from './contexts/AuthContext';
-import { ThemeProvider } from './contexts/ThemeContext';
+import { LangProvider }        from './contexts/LangContext';
+import { AuthProvider }        from './contexts/AuthContext';
+import { ThemeProvider }       from './contexts/ThemeContext';
 
-import AuthGuard         from './components/AuthGuard';
-import SiteLayout        from './components/SiteLayout';
-import SectionPage       from './pages/SectionPage';
-import LoginPage         from './admin/LoginPage';
-import AdminDashboard    from './admin/AdminDashboard';
-import ContentAdmin      from './admin/ContentAdmin';
-import PageEditor        from './admin/PageEditor';
-import TemplateSwitcher  from './admin/TemplateSwitcher';
-import SiteSettings      from './admin/SiteSettings';
-import AdminUsers        from './admin/AdminUsers';
-import CalendarAdmin     from './admin/CalendarAdmin';
+import AuthGuard               from './components/AuthGuard';
+import SiteLayout              from './components/SiteLayout';
+import SectionPage             from './pages/SectionPage';
+import LoginPage               from './admin/LoginPage';
+import AdminDashboard          from './admin/AdminDashboard';
+import ContentAdmin            from './admin/ContentAdmin';
+import PageEditor              from './admin/PageEditor';
+import TemplateSwitcher        from './admin/TemplateSwitcher';
+import SiteSettings            from './admin/SiteSettings';
+import AdminUsers              from './admin/AdminUsers';
+import CalendarAdmin           from './admin/CalendarAdmin';
+import SundaySchoolAdmin       from './admin/SundaySchoolAdmin';
 
 export default function App() {
   return (
@@ -28,15 +29,10 @@ export default function App() {
 
               {/* ── Public site ── */}
               <Route path="/" element={
-                <SiteLayout>
-                  <Navigate to="/section/home" replace />
-                </SiteLayout>
+                <SiteLayout><Navigate to="/section/home" replace /></SiteLayout>
               } />
-
               <Route path="/section/:slug" element={
-                <SiteLayout>
-                  <SectionPage />
-                </SiteLayout>
+                <SiteLayout><SectionPage /></SiteLayout>
               } />
 
               {/* ── Admin — public ── */}
@@ -44,51 +40,33 @@ export default function App() {
 
               {/* ── Admin — protected ── */}
               <Route path="/admin" element={
-                <AuthGuard>
-                  <AdminDashboard />
-                </AuthGuard>
+                <AuthGuard><AdminDashboard /></AuthGuard>
               } />
-
               <Route path="/admin/content" element={
-                <AuthGuard>
-                  <ContentAdmin />
-                </AuthGuard>
+                <AuthGuard><ContentAdmin /></AuthGuard>
               } />
-
               <Route path="/admin/content/edit/:pageId" element={
-                <AuthGuard>
-                  <PageEditor />
-                </AuthGuard>
+                <AuthGuard><PageEditor /></AuthGuard>
               } />
-
               <Route path="/admin/calendar" element={
-                <AuthGuard>
-                  <CalendarAdmin />
-                </AuthGuard>
+                <AuthGuard><CalendarAdmin /></AuthGuard>
+              } />
+              <Route path="/admin/sunday-school" element={
+                <AuthGuard><SundaySchoolAdmin /></AuthGuard>
               } />
 
               {/* Superadmin only */}
               <Route path="/admin/template" element={
-                <AuthGuard requireSuperAdmin>
-                  <TemplateSwitcher />
-                </AuthGuard>
+                <AuthGuard requireSuperAdmin><TemplateSwitcher /></AuthGuard>
               } />
-
               <Route path="/admin/settings" element={
-                <AuthGuard requireSuperAdmin>
-                  <SiteSettings />
-                </AuthGuard>
+                <AuthGuard requireSuperAdmin><SiteSettings /></AuthGuard>
               } />
-
               <Route path="/admin/users" element={
-                <AuthGuard requireSuperAdmin>
-                  <AdminUsers />
-                </AuthGuard>
+                <AuthGuard requireSuperAdmin><AdminUsers /></AuthGuard>
               } />
 
-              {/* Catch-all */}
               <Route path="*" element={<Navigate to="/" replace />} />
-
             </Routes>
           </BrowserRouter>
         </ThemeProvider>

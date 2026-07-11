@@ -1,29 +1,24 @@
 // src/pages/SectionPage.tsx
-// Renders a single section and all its pages.
-// For the 'services' section, the ServiceCalendar is shown above page content.
-// If the section has more than one page, shows anchor links at the top.
 
 import { useEffect, useState } from 'react';
 import { useParams, Navigate } from 'react-router-dom';
 import { useLang } from '../contexts/LangContext';
 import { subscribeSections, subscribePages } from '../lib/firestore';
 import type { Section, Page } from '../lib/firestore';
-import ServiceCalendar from '../components/ServiceCalendar';
+import ServiceCalendar     from '../components/ServiceCalendar';
+import SundaySchoolCalendar from '../components/SundaySchoolCalendar';
 
 export default function SectionPage() {
   const { slug } = useParams<{ slug: string }>();
   const { lang } = useLang();
   const [sections, setSections] = useState<Section[]>([]);
-  const [pages, setPages] = useState<Page[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [pages,    setPages]    = useState<Page[]>([]);
+  const [loading,  setLoading]  = useState(true);
 
   const section = sections.find(s => s.slug === slug);
 
   useEffect(() => {
-    const unsub = subscribeSections(data => {
-      setSections(data);
-      setLoading(false);
-    });
+    const unsub = subscribeSections(data => { setSections(data); setLoading(false); });
     return unsub;
   }, []);
 
@@ -33,61 +28,38 @@ export default function SectionPage() {
     return unsub;
   }, [section?.id]);
 
-  if (loading) {
-    return <div style={{ padding: 60, textAlign: 'center', fontFamily: 'var(--font-body)' }}>Loading…</div>;
-  }
-
-  if (!section) {
-    return <Navigate to="/" replace />;
-  }
+  if (loading) return (
+    <div style={{ padding:60, textAlign:'center', fontFamily:'var(--font-body)' }}>Loading…</div>
+  );
+  if (!section) return <Navigate to="/" replace />;
 
   const sectionTitle = lang === 'en' ? section.nameEn : section.nameRu;
-  const multiPage = pages.length > 1;
+  const multiPage    = pages.length > 1;
 
   return (
-    <div style={{ maxWidth: 960, margin: '0 auto', padding: '48px 24px 80px' }}>
+    <div style={{ maxWidth:960, margin:'0 auto', padding:'48px 24px 80px' }}>
 
-      {/* Section heading */}
-      <h1 style={{
-        fontFamily: 'var(--font-display)',
-        fontSize: 32,
-        fontWeight: 600,
-        letterSpacing: '0.03em',
-        textTransform: 'uppercase',
-        color: 'var(--color-primary)',
-        marginBottom: 32,
-        borderBottom: '2px solid var(--color-accent)',
-        paddingBottom: 14,
-      }}>
+      <h1 style={{ fontFamily:'var(--font-display)', fontSize:32, fontWeight:600,
+        letterSpacing:'0.03em', textTransform:'uppercase', color:'var(--color-primary)',
+        marginBottom:32, borderBottom:'2px solid var(--color-accent)', paddingBottom:14 }}>
         {sectionTitle}
       </h1>
 
-      {/* ── Service Calendar — shown only on the Services section ── */}
-      {section.slug === 'services' && (
-        <ServiceCalendar />
-      )}
+      {/* ── Section-specific calendars ── */}
+      {section.slug === 'services'      && <ServiceCalendar />}
+      {section.slug === 'sunday-school' && <SundaySchoolCalendar />}
 
       {/* Anchor links — only when more than one page */}
       {multiPage && (
-        <nav aria-label="Section pages" style={{ marginBottom: 36 }}>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
+        <nav aria-label="Section pages" style={{ marginBottom:36 }}>
+          <div style={{ display:'flex', flexWrap:'wrap', gap:10 }}>
             {pages.map(page => (
-              <a
-                key={page.id}
-                href={`#page-${page.id}`}
-                style={{
-                  display: 'inline-block',
-                  padding: '7px 16px',
-                  background: 'var(--color-surface, #fff)',
-                  border: '1px solid var(--color-accent)',
-                  color: 'var(--color-primary)',
-                  borderRadius: 2,
-                  fontSize: 13.5,
-                  textDecoration: 'none',
-                  fontFamily: 'var(--font-body)',
-                  letterSpacing: '0.03em',
-                }}
-              >
+              <a key={page.id} href={`#page-${page.id}`} style={{
+                display:'inline-block', padding:'7px 16px',
+                background:'var(--color-surface, #fff)',
+                border:'1px solid var(--color-accent)', color:'var(--color-primary)',
+                borderRadius:2, fontSize:13.5, textDecoration:'none',
+                fontFamily:'var(--font-body)', letterSpacing:'0.03em' }}>
                 {lang === 'en' ? page.titleEn : page.titleRu}
               </a>
             ))}
@@ -97,48 +69,24 @@ export default function SectionPage() {
 
       {/* Pages */}
       {pages.map((page, idx) => (
-        <article
-          key={page.id}
-          id={`page-${page.id}`}
-          style={{
-            marginBottom: 56,
-            paddingTop: multiPage && idx > 0 ? 40 : 0,
-            borderTop: multiPage && idx > 0 ? '1px solid var(--color-accent)' : 'none',
-          }}
-        >
-          {/* Page heading — only shown when multi-page */}
+        <article key={page.id} id={`page-${page.id}`} style={{
+          marginBottom:56, paddingTop: multiPage && idx > 0 ? 40 : 0,
+          borderTop: multiPage && idx > 0 ? '1px solid var(--color-accent)' : 'none' }}>
           {multiPage && (
-            <h2 style={{
-              fontFamily: 'var(--font-display)',
-              fontSize: 22,
-              fontWeight: 600,
-              letterSpacing: '0.02em',
-              textTransform: 'uppercase',
-              color: 'var(--color-primary)',
-              marginBottom: 20,
-            }}>
+            <h2 style={{ fontFamily:'var(--font-display)', fontSize:22, fontWeight:600,
+              letterSpacing:'0.02em', textTransform:'uppercase',
+              color:'var(--color-primary)', marginBottom:20 }}>
               {lang === 'en' ? page.titleEn : page.titleRu}
             </h2>
           )}
-
-          {/* Rich text content */}
-          <div
-            className="rich-content"
-            dangerouslySetInnerHTML={{
-              __html: lang === 'en' ? page.contentEn : page.contentRu,
-            }}
-            style={{
-              fontFamily: 'var(--font-body)',
-              fontSize: 17,
-              lineHeight: 1.7,
-              color: 'var(--color-text)',
-            }}
-          />
+          <div className="rich-content"
+            dangerouslySetInnerHTML={{ __html: lang === 'en' ? page.contentEn : page.contentRu }}
+            style={{ fontFamily:'var(--font-body)', fontSize:17, lineHeight:1.7, color:'var(--color-text)' }} />
         </article>
       ))}
 
       {pages.length === 0 && (
-        <p style={{ color: 'var(--color-muted)', fontStyle: 'italic' }}>
+        <p style={{ color:'var(--color-muted)', fontStyle:'italic' }}>
           {lang === 'en' ? 'No content yet.' : 'Содержимое пока не добавлено.'}
         </p>
       )}

@@ -2,43 +2,47 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Public can read sections and pages
     match /sections/{sectionId} {
       allow read: if true;
       allow write: if request.auth != null && isAdmin();
     }
-
     match /pages/{pageId} {
       allow read: if true;
       allow write: if request.auth != null && isAdmin();
     }
-
-    // Public can read site settings (active template, phone, site name)
     match /settings/{docId} {
       allow read: if true;
       allow write: if request.auth != null && isSuperAdmin();
     }
-
-    // Admins collection — only superadmin can manage
     match /admins/{docId} {
       allow read: if request.auth != null && isAdmin();
       allow write: if request.auth != null && isSuperAdmin();
     }
 
-    // Service schedule entries — public read, any admin can write
+    // Service schedule
     match /serviceEvents/{dateId} {
       allow read: if true;
       allow write: if request.auth != null && isAdmin();
     }
-
-    // Full-day reusable templates — public read, any admin can write
     match /serviceTemplates/{templateId} {
       allow read: if true;
       allow write: if request.auth != null && isAdmin();
     }
-
-    // Individual reusable entry lines — public read, any admin can write
     match /serviceEntryTypes/{entryId} {
+      allow read: if true;
+      allow write: if request.auth != null && isAdmin();
+    }
+
+    // Sunday School
+    match /ssEvents/{dateId} {
+      allow read: if true;
+      allow write: if request.auth != null && isAdmin();
+    }
+    match /ssTemplates/{templateId} {
+      allow read: if true;
+      allow write: if request.auth != null && isAdmin();
+    }
+    match /ssEntryTypes/{entryId} {
       allow read: if true;
       allow write: if request.auth != null && isAdmin();
     }
@@ -51,7 +55,6 @@ service cloud.firestore {
     function isAdmin() {
       return exists(/databases/$(database)/documents/admins/$(request.auth.uid));
     }
-
     function isSuperAdmin() {
       return get(/databases/$(database)/documents/admins/$(request.auth.uid)).data.role == 'superadmin';
     }

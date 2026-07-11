@@ -1,17 +1,17 @@
-// src/components/ServiceCalendar.tsx
-// Public-facing service schedule.
+// src/components/SundaySchoolCalendar.tsx
+// Public-facing Sunday School schedule.
 // Default: list/table view with copy-to-clipboard for Word.
-// Toggle: full calendar grid with Julian feast highlighting.
+// Toggle: simple calendar grid (weekends + NZ holidays only, no church markings).
+// Lesson header lines (containing HH:MM) are bolded and act as section headings.
+// Sub-item lines (no time) are indented under their lesson header.
 
 import { useEffect, useState } from 'react';
 import { useLang } from '../contexts/LangContext';
-import { getDayData } from '../lib/calendarData';
-import type { DayData } from '../lib/calendarData';
-import { subscribeServiceEventsForMonth } from '../lib/firestore';
-import type { ServiceEvent } from '../lib/firestore';
+import { NZ_HOLIDAYS } from '../lib/calendarData';
+import { subscribeSSEventsForMonth } from '../lib/firestore';
+import type { SSEvent } from '../lib/firestore';
 
 // ── Locale data ───────────────────────────────────────────────────────────────
-
 const MONTHS_EN = [
   'January','February','March','April','May','June',
   'July','August','September','October','November','December',
@@ -30,12 +30,20 @@ const DOW_EN  = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
 const DOW_RU  = ['Пн','Вт','Ср','Чт','Пт','Сб','Вс'];
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
-
 function toDateStr(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
 }
+function getNZHoliday(date: Date): string | null {
+  return NZ_HOLIDAYS[toDateStr(date)]?.name || null;
+}
+const TIME_RE = /\b\d{1,2}:\d{2}\b/;
 
-// Bold time patterns like 8:30, 10:00, 18:00 within a line of text — React output
+// Is this line a lesson header (contains a time)?
+function isLessonHeader(line: string): boolean {
+  return TIME_RE.test(line);
+}
+
+// Bold the time portion within a line — returns React nodes
 function parseTimeLine(line: string): React.ReactNode[] {
   const parts = line.split(/(\b\d{1,2}:\d{2}\b)/);
   return parts.map((part, i) =>
@@ -45,64 +53,78 @@ function parseTimeLine(line: string): React.ReactNode[] {
   );
 }
 
-// Parse multi-line entry text into rendered lines with bolded times
-function renderEntryText(text: string): React.ReactNode {
+// Render multi-line entry: lesson headers bold + no indent, sub-items indented
+function renderSSEntries(text: string): React.ReactNode {
+  const lines = text.split('\n').filter(l => l.trim());
   return (
     <>
-      {text.split('\n').filter(l => l.trim()).map((line, i) => (
-        <div key={i} style={{ lineHeight:1.6 }}>{parseTimeLine(line)}</div>
-      ))}
+      {lines.map((line, i) => {
+        const isHeader = isLessonHeader(line);
+        return (
+          <div key={i} style={{
+            lineHeight: 1.6,
+            paddingLeft: isHeader ? 0 : 18,
+            marginTop: isHeader && i > 0 ? 8 : 0,
+            fontWeight: isHeader ? 700 : 400,
+          }}>
+            {parseTimeLine(line)}
+          </div>
+        );
+      })}
     </>
   );
 }
 
-// Bold times in a plain string — HTML output (for clipboard)
+// Bold times in a string → HTML (for clipboard)
 function timeLineToHtml(line: string): string {
   return line.replace(/(\b\d{1,2}:\d{2}\b)/g, '<strong>$1</strong>');
 }
 
-// ── Cell styling (calendar view) ──────────────────────────────────────────────
-function getCellStyle(d: DayData) {
-  const tier  = d.moveableFeast?.tier  || d.fixedFeast?.tier;
-  const color = d.moveableFeast?.color || d.fixedFeast?.color;
-  if (d.isPascha)            return { bg:'#FFF0D0', border:'#C4881A', text:'#8B0000', bold:true  };
-  if (d.isHolyWeek)          return { bg:'#F5E8E0', border:'#B07060', text:'#6A2010', bold:false };
-  if (d.isBrightWeek)        return { bg:'#FFFAE0', border:'#C8A820', text:'#7A5A00', bold:false };
-  if (color === 'palm')      return { bg:'#EEF5E8', border:'#6A9050', text:'#2E5820', bold:true  };
-  if (color === 'pentecost') return { bg:'#EEF5E8', border:'#5A8A48', text:'#2A5818', bold:true  };
-  if (color === 'nativity')  return { bg:'#EAF0FA', border:'#5A78B8', text:'#1E3870', bold:true  };
-  if (tier  === 'great')     return { bg:'#FDE8E8', border:'#C07070', text:'#7A1010', bold:true  };
-  if (d.isSunday)            return { bg:'var(--color-surface,#fff)', border:'var(--color-accent)', text:'var(--color-primary)', bold:true };
-  return { bg:'var(--color-surface,#fff)', border:'var(--color-accent,#c9a227)', text:'var(--color-text,#2b2418)', bold:false };
+// Build HTML for one entry block (for Word copy)
+function ssEntryToHtml(text: string): string {
+  const lines = text.split('\n').filter(l => l.trim());
+  return lines.map((line, i) => {
+    const isHeader = isLessonHeader(line);
+    if (isHeader) {
+      const spacing = i > 0 ? 'margin:6pt 0 2pt 0' : 'margin:0 0 2pt 0';
+      return `<p style="${spacing};font-weight:bold;line-height:1.4"><strong>${timeLineToHtml(line)}</strong></p>`;
+    }
+    return `<p style="margin:0 0 1pt 14pt;line-height:1.4">${timeLineToHtml(line)}</p>`;
+  }).join('');
+}
+
+// Simple cell style — weekends + holidays only
+function getCellStyle(date: Date) {
+  const jsDay = date.getDay();
+  if (jsDay === 0) return { bg:'#FFF5F5', border:'#D4B0B0', text:'#8B0000', bold:true  };
+  if (jsDay === 6) return { bg:'#FFF8F8', border:'#E0C0C0', text:'#8B0000', bold:false };
+  return { bg:'var(--color-surface,#fff)', border:'var(--color-accent,#c9a227)', text:'var(--color-text)', bold:false };
 }
 
 // ════════════════════════════════════════════════════════════════════════════
-export default function ServiceCalendar() {
+export default function SundaySchoolCalendar() {
   const { lang } = useLang();
   const [view,         setView]         = useState<'list'|'calendar'>('list');
   const [year,         setYear]         = useState(new Date().getFullYear());
   const [month,        setMonth]        = useState(new Date().getMonth());
   const [selectedDate, setSelectedDate] = useState<string|null>(null);
-  const [events,       setEvents]       = useState<Record<string, ServiceEvent>>({});
+  const [events,       setEvents]       = useState<Record<string, SSEvent>>({});
   const [copied,       setCopied]       = useState(false);
 
-  useEffect(() => subscribeServiceEventsForMonth(year, month, setEvents), [year, month]);
+  useEffect(() => subscribeSSEventsForMonth(year, month, setEvents), [year, month]);
 
   function prevMonth() {
     setSelectedDate(null);
-    if (month === 0) { setYear(y => y-1); setMonth(11); }
-    else setMonth(m => m-1);
+    if (month === 0) { setYear(y => y-1); setMonth(11); } else setMonth(m => m-1);
   }
   function nextMonth() {
     setSelectedDate(null);
-    if (month === 11) { setYear(y => y+1); setMonth(0); }
-    else setMonth(m => m+1);
+    if (month === 11) { setYear(y => y+1); setMonth(0); } else setMonth(m => m+1);
   }
 
   const monthNameEn = MONTHS_EN[month];
   const monthNameRu = MONTHS_RU_TITLE[month];
 
-  // Days in current month that have entries, sorted
   const daysWithEntries = Object.entries(events)
     .filter(([dateStr]) => {
       const d = new Date(dateStr + 'T12:00:00');
@@ -110,11 +132,11 @@ export default function ServiceCalendar() {
     })
     .sort(([a], [b]) => a.localeCompare(b));
 
-  // ── Copy to clipboard (HTML → Word) ────────────────────────────────────────
+  // ── Copy to clipboard ─────────────────────────────────────────────────────
   async function copyToClipboard() {
     const title = lang === 'ru'
-      ? `Расписание богослужений на ${monthNameRu} ${year}`
-      : `Service Schedule for ${monthNameEn} ${year}`;
+      ? `Расписание воскресной школы на ${monthNameRu} ${year}`
+      : `Sunday School Schedule for ${monthNameEn} ${year}`;
 
     const tableRows = daysWithEntries.map(([dateStr, event]) => {
       const d         = new Date(dateStr + 'T12:00:00');
@@ -123,24 +145,22 @@ export default function ServiceCalendar() {
         ? `${d.getDate()} ${MONTHS_RU_GENITIVE[month]}`
         : `${d.getDate()} ${monthNameEn}`;
       const dayLabel  = lang === 'ru' ? DAYS_RU[jsDay] : DAYS_EN[jsDay];
-
+      const holiday   = getNZHoliday(d);
       const raw = lang === 'ru'
         ? (event.entriesRu || event.entriesEn)
         : (event.entriesEn || event.entriesRu);
 
-      const entryHtml = raw
-        .split('\n')
-        .filter(l => l.trim())
-        .map(line => `<p style="margin:0 0 2pt 0;line-height:1.5">${timeLineToHtml(line)}</p>`)
-        .join('');
+      const dateCellContent = holiday
+        ? `<strong>${dateLabel}</strong><br/>${dayLabel}<br/><span style="color:#2A7A6A;font-size:9pt">🇳🇿 ${holiday}</span>`
+        : `<strong>${dateLabel}</strong><br/>${dayLabel}`;
 
       return `
         <tr>
-          <td style="padding:7pt 10pt;width:28%;vertical-align:top;border:1pt solid black">
-            <strong>${dateLabel}</strong><br/>${dayLabel}
+          <td style="padding:7pt 10pt;width:26%;vertical-align:top;border:1pt solid black">
+            ${dateCellContent}
           </td>
           <td style="padding:7pt 10pt;vertical-align:top;border:1pt solid black">
-            ${entryHtml}
+            ${ssEntryToHtml(raw)}
           </td>
         </tr>`;
     }).join('');
@@ -151,15 +171,14 @@ export default function ServiceCalendar() {
                   font-family:Calibri,Arial,sans-serif;margin:0 0 10pt 0">
           ${title}
         </p>
-        <table style="border-collapse:collapse;width:100%;font-family:Calibri,Arial,sans-serif;font-size:11pt">
+        <table style="border-collapse:collapse;width:100%;
+                      font-family:Calibri,Arial,sans-serif;font-size:11pt">
           <tbody>${tableRows}</tbody>
         </table>
       </body></html>`;
 
-    // Plain-text fallback
     const plain = [
-      title,
-      '',
+      title, '',
       ...daysWithEntries.map(([dateStr, event]) => {
         const d = new Date(dateStr + 'T12:00:00');
         const dateLabel = lang === 'ru'
@@ -180,14 +199,11 @@ export default function ServiceCalendar() {
           'text/plain': new Blob([plain], { type: 'text/plain' }),
         }),
       ]);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2500);
+      setCopied(true); setTimeout(() => setCopied(false), 2500);
     } catch {
-      // Fallback for browsers that don't support ClipboardItem
       try {
         await navigator.clipboard.writeText(plain);
-        setCopied(true);
-        setTimeout(() => setCopied(false), 2500);
+        setCopied(true); setTimeout(() => setCopied(false), 2500);
       } catch {
         alert(lang === 'ru' ? 'Не удалось скопировать.' : 'Could not copy to clipboard.');
       }
@@ -199,32 +215,25 @@ export default function ServiceCalendar() {
     return (
       <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:20, flexWrap:'wrap' }}>
         <button onClick={prevMonth}
-          aria-label={lang === 'ru' ? 'Предыдущий месяц' : 'Previous month'}
           style={{ background:'none', border:'1px solid var(--color-accent)', borderRadius:2,
-            color:'var(--color-accent)', padding:'7px 14px', cursor:'pointer',
-            fontSize:16, flexShrink:0 }}>←</button>
+            color:'var(--color-accent)', padding:'7px 14px', cursor:'pointer', fontSize:16, flexShrink:0 }}>←</button>
 
         <h2 style={{ flex:1, textAlign:'center', margin:0,
-          fontFamily:'var(--font-display)', fontSize:20,
-          color:'var(--color-primary)', fontWeight:600,
-          letterSpacing:'0.03em', textTransform:'uppercase' }}>
+          fontFamily:'var(--font-display)', fontSize:20, fontWeight:600,
+          color:'var(--color-primary)', letterSpacing:'0.03em', textTransform:'uppercase' }}>
           {lang === 'ru' ? `${monthNameRu} ${year}` : `${monthNameEn} ${year}`}
         </h2>
 
         <button onClick={nextMonth}
-          aria-label={lang === 'ru' ? 'Следующий месяц' : 'Next month'}
           style={{ background:'none', border:'1px solid var(--color-accent)', borderRadius:2,
-            color:'var(--color-accent)', padding:'7px 14px', cursor:'pointer',
-            fontSize:16, flexShrink:0 }}>→</button>
+            color:'var(--color-accent)', padding:'7px 14px', cursor:'pointer', fontSize:16, flexShrink:0 }}>→</button>
 
-        {/* View toggle */}
         <div style={{ display:'flex', border:'1px solid var(--color-accent)',
           borderRadius:3, overflow:'hidden', flexShrink:0 }}>
           {(['list','calendar'] as const).map(v => (
             <button key={v} onClick={() => setView(v)} style={{
               padding:'7px 14px', border:'none', cursor:'pointer', fontSize:12,
-              fontWeight: view === v ? 700 : 400,
-              letterSpacing:'0.04em', textTransform:'uppercase',
+              fontWeight: view === v ? 700 : 400, letterSpacing:'0.04em', textTransform:'uppercase',
               background: view === v ? 'var(--color-primary)' : 'transparent',
               color: view === v ? 'var(--color-accent)' : 'var(--color-primary)',
               fontFamily:'var(--font-body)', transition:'background 0.15s',
@@ -242,40 +251,27 @@ export default function ServiceCalendar() {
   // ── LIST VIEW ─────────────────────────────────────────────────────────────
   function renderListView() {
     const title = lang === 'ru'
-      ? `Расписание богослужений на ${monthNameRu} ${year}`
-      : `Service Schedule for ${monthNameEn} ${year}`;
+      ? `Расписание воскресной школы на ${monthNameRu} ${year}`
+      : `Sunday School Schedule for ${monthNameEn} ${year}`;
 
     return (
       <div>
-        {/* Title row + copy button */}
         <div style={{ display:'flex', alignItems:'center',
           justifyContent:'space-between', gap:12, marginBottom:20, flexWrap:'wrap' }}>
-          <div style={{ flex:1, textAlign:'center',
-            fontFamily:'var(--font-display)', fontSize:18,
-            fontWeight:600, color:'var(--color-primary)', letterSpacing:'0.02em' }}>
+          <div style={{ flex:1, textAlign:'center', fontFamily:'var(--font-display)',
+            fontSize:18, fontWeight:600, color:'var(--color-primary)', letterSpacing:'0.02em' }}>
             {title}
           </div>
-
-          {/* Copy to clipboard button — only shown when there's something to copy */}
           {daysWithEntries.length > 0 && (
-            <button
-              onClick={copyToClipboard}
-              title={lang === 'ru'
-                ? 'Скопировать таблицу в буфер обмена (для вставки в Word)'
-                : 'Copy table to clipboard (paste into Word)'}
-              style={{
-                display:'flex', alignItems:'center', gap:6,
+            <button onClick={copyToClipboard}
+              style={{ display:'flex', alignItems:'center', gap:6,
                 padding:'7px 14px', borderRadius:3, cursor:'pointer',
-                border:'1px solid var(--color-accent)',
+                border:'1px solid var(--color-accent)', flexShrink:0,
                 background: copied ? 'var(--color-primary)' : 'transparent',
                 color: copied ? 'var(--color-accent)' : 'var(--color-primary)',
                 fontFamily:'var(--font-body)', fontSize:13,
-                fontWeight: copied ? 700 : 400,
-                letterSpacing:'0.02em',
-                transition:'background 0.2s, color 0.2s',
-                flexShrink:0,
-              }}
-            >
+                fontWeight: copied ? 700 : 400, letterSpacing:'0.02em',
+                transition:'background 0.2s, color 0.2s' }}>
               {copied
                 ? (lang === 'ru' ? '✓ Скопировано!' : '✓ Copied!')
                 : (lang === 'ru' ? '📋 Копировать' : '📋 Copy')}
@@ -287,27 +283,23 @@ export default function ServiceCalendar() {
           <p style={{ color:'var(--color-muted)', fontStyle:'italic',
             fontFamily:'var(--font-body)', textAlign:'center', padding:'32px 0' }}>
             {lang === 'ru'
-              ? 'Расписание богослужений на этот месяц ещё не добавлено.'
-              : 'No service schedule posted for this month yet.'}
+              ? 'Расписание воскресной школы на этот месяц ещё не добавлено.'
+              : 'No Sunday School schedule posted for this month yet.'}
           </p>
         ) : (
           <table style={{ width:'100%', borderCollapse:'collapse',
             fontFamily:'var(--font-body)', fontSize:16 }}>
             <tbody>
               {daysWithEntries.map(([dateStr, event]) => {
-                const d        = new Date(dateStr + 'T12:00:00');
-                const jsDay    = d.getDay();
-                const dayData  = getDayData(d, true);
-                const isSat    = jsDay === 6;
-                const isSun    = jsDay === 0;
-                const isWeekend = isSat || isSun;
-
+                const d       = new Date(dateStr + 'T12:00:00');
+                const jsDay   = d.getDay();
+                const isSun   = jsDay === 0;
+                const isSat   = jsDay === 6;
+                const holiday = getNZHoliday(d);
                 const dateLabel = lang === 'ru'
                   ? `${d.getDate()} ${MONTHS_RU_GENITIVE[month]}`
                   : `${d.getDate()} ${monthNameEn}`;
                 const dayLabel = lang === 'ru' ? DAYS_RU[jsDay] : DAYS_EN[jsDay];
-                const feastName = dayData.moveableFeast?.name || dayData.fixedFeast?.name || '';
-
                 const entryText = lang === 'ru'
                   ? (event.entriesRu || event.entriesEn)
                   : (event.entriesEn || event.entriesRu);
@@ -316,28 +308,26 @@ export default function ServiceCalendar() {
                   <tr key={dateStr} style={{ borderTop:'1px solid var(--color-accent)', verticalAlign:'top' }}>
                     <td style={{ padding:'12px 16px 12px 0', width:'28%', minWidth:110 }}>
                       <div style={{ fontWeight:700, fontSize:17,
-                        color: isWeekend ? '#8B0000' : 'var(--color-primary)' }}>
+                        color: (isSun||isSat) ? '#8B0000' : 'var(--color-primary)' }}>
                         {dateLabel}
                       </div>
                       <div style={{ fontSize:14, color:'var(--color-muted)', marginTop:1, lineHeight:1.3 }}>
                         {dayLabel}
                       </div>
-                      {feastName && (
-                        <div style={{ fontSize:11.5, color:'#8B0000', fontStyle:'italic',
-                          marginTop:3, lineHeight:1.3 }}>
-                          {feastName.length > 32 ? feastName.substring(0,30)+'…' : feastName}
+                      {holiday && (
+                        <div style={{ fontSize:11.5, color:'#2A7A6A', marginTop:3, lineHeight:1.3 }}>
+                          🇳🇿 {holiday}
                         </div>
                       )}
                     </td>
                     <td style={{ padding:'12px 0 12px 16px',
                       borderLeft:'2px solid var(--color-accent)',
-                      color:'var(--color-text)', fontSize:16 }}>
-                      {renderEntryText(entryText)}
+                      color:'var(--color-text)', fontSize:15 }}>
+                      {renderSSEntries(entryText)}
                     </td>
                   </tr>
                 );
               })}
-              {/* Bottom border */}
               <tr>
                 <td colSpan={2} style={{ borderTop:'1px solid var(--color-accent)', padding:0, height:0 }} />
               </tr>
@@ -350,7 +340,7 @@ export default function ServiceCalendar() {
 
   // ── CALENDAR VIEW ─────────────────────────────────────────────────────────
   function renderCalendarView() {
-    const DOW    = lang === 'ru' ? DOW_RU : DOW_EN;
+    const DOW     = lang === 'ru' ? DOW_RU : DOW_EN;
     const firstDay    = new Date(year, month, 1);
     const daysInMonth = new Date(year, month + 1, 0).getDate();
     const startOffset = (firstDay.getDay() + 6) % 7;
@@ -362,9 +352,6 @@ export default function ServiceCalendar() {
     while (cells.length % 7 !== 0) cells.push(null);
 
     const selectedEvent   = selectedDate ? events[selectedDate] : null;
-    const selectedDayData = selectedDate
-      ? getDayData(new Date(selectedDate + 'T12:00:00'), true)
-      : null;
 
     function formatSelectedDate(dateStr: string) {
       const d = new Date(dateStr + 'T12:00:00');
@@ -398,17 +385,19 @@ export default function ServiceCalendar() {
                 <div key={idx} style={{ background:'var(--color-bg,#f8f5ee)', minHeight:52 }} />
               );
               const dateStr    = toDateStr(date);
-              const dayData    = getDayData(date, true);
-              const cs         = getCellStyle(dayData);
+              const cs         = getCellStyle(date);
               const isSelected = selectedDate === dateStr;
               const hasEntries = !!events[dateStr];
+              const holiday    = getNZHoliday(date);
               const isSat      = date.getDay() === 6;
-              const feastName  = dayData.moveableFeast?.name || dayData.fixedFeast?.name || '';
-              const short      = feastName.length > 20 ? feastName.substring(0,18)+'…' : feastName;
+              const short      = holiday
+                ? (holiday.length > 16 ? holiday.substring(0,14)+'…' : holiday)
+                : '';
 
               return (
                 <button key={idx}
                   onClick={() => setSelectedDate(isSelected ? null : dateStr)}
+                  title={holiday || ''}
                   style={{ background:cs.bg, border:'none',
                     outline: isSelected ? '2px solid var(--color-accent)' : 'none',
                     outlineOffset:-2, padding:'6px 3px 5px', minHeight:52,
@@ -418,17 +407,16 @@ export default function ServiceCalendar() {
                   onMouseLeave={e => (e.currentTarget.style.filter = 'none')}
                 >
                   <span style={{ fontFamily:'var(--font-display)', fontSize:15, lineHeight:1,
-                    fontWeight: cs.bold || isSat ? 700 : 400,
-                    color: (isSat && !cs.bold) ? '#8B0000' : cs.text }}>
+                    fontWeight: cs.bold || isSat ? 700 : 400, color: cs.text }}>
                     {date.getDate()}
                   </span>
                   {short && (
-                    <span style={{ fontSize:7.5, color:cs.text, opacity:0.7,
-                      textAlign:'center', lineHeight:1.2, wordBreak:'break-word', padding:'0 2px' }}>
+                    <span style={{ fontSize:7.5, color:'#2A7A6A', textAlign:'center',
+                      lineHeight:1.2, wordBreak:'break-word', padding:'0 2px' }}>
                       {short}
                     </span>
                   )}
-                  {dayData.nzHoliday && (
+                  {holiday && (
                     <span style={{ position:'absolute', top:0, right:0, width:0, height:0,
                       borderStyle:'solid', borderWidth:'0 8px 8px 0',
                       borderColor:'transparent #2A7A6A transparent transparent' }} />
@@ -443,8 +431,8 @@ export default function ServiceCalendar() {
           </div>
         </div>
 
-        {/* Day detail panel */}
-        {selectedDate && selectedDayData && (
+        {/* Day detail */}
+        {selectedDate && (
           <div style={{ background:'var(--color-surface,#fff)',
             border:'1px solid var(--color-accent)', borderRadius:3, padding:'20px 24px' }}>
             <div style={{ fontFamily:'var(--font-display)', fontSize:17,
@@ -452,23 +440,9 @@ export default function ServiceCalendar() {
               letterSpacing:'0.02em', textTransform:'uppercase' }}>
               {formatSelectedDate(selectedDate)}
             </div>
-            {(selectedDayData.moveableFeast || selectedDayData.fixedFeast) && (
-              <div style={{ marginTop:4, fontSize:14, fontStyle:'italic',
-                color:'#8B0000', fontFamily:'var(--font-body)' }}>
-                ✦{' '}
-                {selectedDayData.isPascha
-                  ? (lang === 'ru' ? 'СВЯТАЯ ПАСХА' : 'HOLY PASCHA')
-                  : (selectedDayData.moveableFeast?.name || selectedDayData.fixedFeast?.name)}
-              </div>
-            )}
-            {selectedDayData.nzHoliday && (
-              <div style={{ marginTop:3, fontSize:13, color:'#2A7A6A', fontFamily:'var(--font-body)' }}>
-                🇳🇿 {selectedDayData.nzHoliday.name}
-              </div>
-            )}
-            {selectedDayData.julianDateStr && (
-              <div style={{ marginTop:3, fontSize:11, color:'var(--color-muted)', fontFamily:'var(--font-body)' }}>
-                {lang === 'ru' ? 'По старому стилю: ' : 'Old Style: '}{selectedDayData.julianDateStr}
+            {getNZHoliday(new Date(selectedDate + 'T12:00:00')) && (
+              <div style={{ marginTop:4, fontSize:13, color:'#2A7A6A', fontFamily:'var(--font-body)' }}>
+                🇳🇿 {getNZHoliday(new Date(selectedDate + 'T12:00:00'))}
               </div>
             )}
             <div style={{ borderTop:'1px solid var(--color-accent)', paddingTop:14, marginTop:12 }}>
@@ -477,11 +451,11 @@ export default function ServiceCalendar() {
                   <div style={{ fontSize:11, fontWeight:600, letterSpacing:'0.1em',
                     textTransform:'uppercase', color:'var(--color-muted)',
                     marginBottom:10, fontFamily:'var(--font-body)' }}>
-                    {lang === 'ru' ? 'Расписание богослужений' : 'Service Schedule'}
+                    {lang === 'ru' ? 'Расписание занятий' : 'Lesson Schedule'}
                   </div>
-                  <div style={{ fontFamily:'var(--font-body)', fontSize:16,
-                    lineHeight:1.8, color:'var(--color-text)' }}>
-                    {renderEntryText(
+                  <div style={{ fontFamily:'var(--font-body)', fontSize:15,
+                    lineHeight:1.7, color:'var(--color-text)' }}>
+                    {renderSSEntries(
                       lang === 'ru'
                         ? (selectedEvent.entriesRu || selectedEvent.entriesEn)
                         : (selectedEvent.entriesEn || selectedEvent.entriesRu)
@@ -492,8 +466,8 @@ export default function ServiceCalendar() {
                 <p style={{ margin:0, fontSize:14, color:'var(--color-muted)',
                   fontStyle:'italic', fontFamily:'var(--font-body)' }}>
                   {lang === 'ru'
-                    ? 'Расписание богослужений пока не добавлено.'
-                    : 'No service schedule posted for this day yet.'}
+                    ? 'Расписание занятий пока не добавлено.'
+                    : 'No lesson schedule posted for this day yet.'}
                 </p>
               )}
             </div>
@@ -504,11 +478,8 @@ export default function ServiceCalendar() {
         <div style={{ marginTop:12, display:'flex', flexWrap:'wrap', gap:'6px 16px',
           fontSize:11, color:'var(--color-muted)', fontFamily:'var(--font-body)' }}>
           {[
-            { bg:'#FFF0D0', label: lang === 'ru' ? 'Пасха' : 'Pascha' },
-            { bg:'#FDE8E8', label: lang === 'ru' ? 'Великий праздник' : 'Great Feast' },
-            { bg:'#EEF5E8', label: lang === 'ru' ? 'Вербное / Пятидесятница' : 'Palm / Pentecost' },
-            { bg:'#FFFAE0', label: lang === 'ru' ? 'Светлая неделя' : 'Bright Week' },
-            { bg:'#F5E8E0', label: lang === 'ru' ? 'Страстная неделя' : 'Holy Week' },
+            { bg:'#FFF5F5', label: lang === 'ru' ? 'Воскресенье' : 'Sunday' },
+            { bg:'#FFF8F8', label: lang === 'ru' ? 'Суббота' : 'Saturday' },
           ].map(item => (
             <span key={item.label} style={{ display:'flex', alignItems:'center', gap:4 }}>
               <span style={{ width:10, height:10, borderRadius:2, background:item.bg,
@@ -521,12 +492,17 @@ export default function ServiceCalendar() {
               display:'inline-block', flexShrink:0 }} />
             {lang === 'ru' ? 'Есть расписание' : 'Schedule posted'}
           </span>
+          <span style={{ display:'flex', alignItems:'center', gap:4 }}>
+            <span style={{ width:0, height:0, display:'inline-block', borderStyle:'solid',
+              borderWidth:'0 8px 8px 0', flexShrink:0,
+              borderColor:'transparent #2A7A6A transparent transparent' }} />
+            {lang === 'ru' ? 'Праздник НЗ' : 'NZ holiday'}
+          </span>
         </div>
       </div>
     );
   }
 
-  // ── Render ────────────────────────────────────────────────────────────────
   return (
     <div style={{ marginBottom:48 }}>
       {renderHeader()}
