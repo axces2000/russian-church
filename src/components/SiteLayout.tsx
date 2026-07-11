@@ -161,20 +161,38 @@ export default function SiteLayout({ children }: SiteLayoutProps) {
             <div style={{ color: '#fff', fontSize: 13, letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 10 }}>
               {lang === 'en' ? 'Visit Us' : 'Наш адрес'}
             </div>
-            <p style={{ margin: 0, fontSize: 13.5 }}>62 Darlington Road, Miramar, Wellington 6022</p>
+            <p style={{ margin: 0, fontSize: 13.5 }}>
+              <a
+                href="https://maps.app.goo.gl/F9NHkeNPLXyuhbdg6"
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{ color: 'inherit', textDecoration: 'underline', textUnderlineOffset: 3 }}
+              >
+                62 Darlington Road, Miramar, Wellington 6022
+              </a>
+            </p>
           </div>
 <div>
   <div style={{ color: '#fff', fontSize: 13, letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 10 }}>
     {lang === 'en' ? 'Contact' : 'Контакты'}
   </div>
-  {(settings?.contactNameEn || settings?.contactNameRu) ? (
+  {(settings?.contactNameEn || settings?.contactNameRu || settings?.phone) && (
     <p style={{ margin: 0, fontSize: 13.5 }}>
-      {lang === 'en'
-        ? (settings.contactNameEn || settings.contactNameRu)
-        : (settings.contactNameRu || settings.contactNameEn)}
+      {settings?.phone ? (
+        <a
+          href={`tel:${settings.phone.replace(/[^\d+]/g, '')}`}
+          style={{ color: 'inherit', textDecoration: 'underline', textUnderlineOffset: 3 }}
+        >
+          {lang === 'en'
+            ? (settings.contactNameEn || settings.contactNameRu || settings.phone)
+            : (settings.contactNameRu || settings.contactNameEn || settings.phone)}
+        </a>
+      ) : (
+        lang === 'en'
+          ? (settings.contactNameEn || settings.contactNameRu)
+          : (settings.contactNameRu || settings.contactNameEn)
+      )}
     </p>
-  ) : (
-    settings?.phone && <p style={{ margin: 0, fontSize: 13.5 }}>{settings.phone}</p>
   )}
 </div>
           <div>
@@ -182,7 +200,14 @@ export default function SiteLayout({ children }: SiteLayoutProps) {
               {lang === 'en' ? 'Diocese' : 'Епархия'}
             </div>
             <p style={{ margin: 0, fontSize: 13.5 }}>
-              {lang === 'en' ? 'Australian & New Zealand Diocese, ROCOR' : 'Австралийско-Новозеландская епархия РПЦЗ'}
+              <a
+                href="https://rocor.org.au/"
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{ color: 'inherit', textDecoration: 'underline', textUnderlineOffset: 3 }}
+              >
+                {lang === 'en' ? 'Australian & New Zealand Diocese, ROCOR' : 'Австралийско-Новозеландская епархия РПЦЗ'}
+              </a>
             </p>
           </div>
         </div>
