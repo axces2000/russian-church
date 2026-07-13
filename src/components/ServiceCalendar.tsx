@@ -5,7 +5,7 @@
 
 import { useEffect, useState } from 'react';
 import { useLang } from '../contexts/LangContext';
-import { getDayData } from '../lib/calendarData';
+import { getDayData, getFeastName } from '../lib/calendarData';
 import type { DayData } from '../lib/calendarData';
 import { subscribeServiceEventsForMonth } from '../lib/firestore';
 import type { ServiceEvent } from '../lib/firestore';
@@ -306,7 +306,7 @@ export default function ServiceCalendar() {
                   ? `${d.getDate()} ${MONTHS_RU_GENITIVE[month]}`
                   : `${d.getDate()} ${monthNameEn}`;
                 const dayLabel = lang === 'ru' ? DAYS_RU[jsDay] : DAYS_EN[jsDay];
-                const feastName = dayData.moveableFeast?.name || dayData.fixedFeast?.name || '';
+                const feastName = getFeastName(dayData.moveableFeast, lang) || getFeastName(dayData.fixedFeast, lang);
 
                 const entryText = lang === 'ru'
                   ? (event.entriesRu || event.entriesEn)
@@ -325,7 +325,7 @@ export default function ServiceCalendar() {
                       {feastName && (
                         <div style={{ fontSize:11.5, color:'#8B0000', fontStyle:'italic',
                           marginTop:3, lineHeight:1.3 }}>
-                          {feastName.length > 32 ? feastName.substring(0,30)+'…' : feastName}
+                          {feastName}
                         </div>
                       )}
                     </td>
@@ -403,7 +403,7 @@ export default function ServiceCalendar() {
               const isSelected = selectedDate === dateStr;
               const hasEntries = !!events[dateStr];
               const isSat      = date.getDay() === 6;
-              const feastName  = dayData.moveableFeast?.name || dayData.fixedFeast?.name || '';
+              const feastName  = getFeastName(dayData.moveableFeast, lang) || getFeastName(dayData.fixedFeast, lang);
               const short      = feastName.length > 20 ? feastName.substring(0,18)+'…' : feastName;
 
               return (
@@ -458,7 +458,7 @@ export default function ServiceCalendar() {
                 ✦{' '}
                 {selectedDayData.isPascha
                   ? (lang === 'ru' ? 'СВЯТАЯ ПАСХА' : 'HOLY PASCHA')
-                  : (selectedDayData.moveableFeast?.name || selectedDayData.fixedFeast?.name)}
+                  : (getFeastName(selectedDayData.moveableFeast, lang) || getFeastName(selectedDayData.fixedFeast, lang))}
               </div>
             )}
             {selectedDayData.nzHoliday && (
