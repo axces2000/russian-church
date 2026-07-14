@@ -5,8 +5,8 @@
 
 import { useEffect, useState } from 'react';
 import { useLang } from '../contexts/LangContext';
-import { getDayData, getFeastName } from '../lib/calendarData';
-import type { DayData } from '../lib/calendarData';
+import { getDayData, getFeastName, getFastLabel, FAST_DISPLAY } from '../lib/calendarData';
+import type { DayData, FastType } from '../lib/calendarData';
 import { subscribeServiceEventsForMonth } from '../lib/firestore';
 import type { ServiceEvent } from '../lib/firestore';
 
@@ -74,6 +74,59 @@ function getCellStyle(d: DayData) {
   if (tier  === 'great')     return { bg:'#FDE8E8', border:'#C07070', text:'#7A1010', bold:true  };
   if (d.isSunday)            return { bg:'var(--color-surface,#fff)', border:'var(--color-accent)', text:'var(--color-primary)', bold:true };
   return { bg:'var(--color-surface,#fff)', border:'var(--color-accent,#c9a227)', text:'var(--color-text,#2b2418)', bold:false };
+}
+
+// ── Fast-type icon (small line-art SVG, replaces emoji glyphs) ────────────────
+function FastIcon({ type, size = 14 }: { type: Exclude<FastType, null>; size?: number }) {
+  const color = FAST_DISPLAY[type].color;
+  // Every filled shape gets a thin white outline so the contour reads
+  // clearly against light or dark cell backgrounds alike.
+  const outline = { fill: color, stroke: '#fff', strokeWidth: 1, strokeLinejoin: 'round' as const };
+  switch (type) {
+    case 'strict':
+      // Bold plus/cross — traditional calendar mark for a strict fasting day
+      return (
+        <svg width={size} height={size} viewBox="0 0 24 24" aria-hidden="true">
+          <path {...outline} d="M9 1.5h6v7.5h7.5v6H15v7.5H9V15H1.5V9H9z" />
+        </svg>
+      );
+    case 'oilwine':
+      // Oil droplet
+      return (
+        <svg width={size} height={size} viewBox="0 0 24 24" aria-hidden="true">
+          <path {...outline} d="M12 2.2 18.5 9.5A8 8 0 1 1 5.5 9.5z" />
+        </svg>
+      );
+    case 'fish':
+      // Fish silhouette: rounded body narrowing into a distinct forked tail
+      // (the notch at the tail keeps it from reading as a plain oval blob)
+      return (
+        <svg width={size} height={size} viewBox="0 0 24 24" aria-hidden="true">
+          <path {...outline} d="M1 12Q4 4 12 6L16 9L23 4L17 12L23 20L16 15Q4 20 1 12Z" />
+          <circle cx="7" cy="9.2" r="1.4" fill="#fff" />
+        </svg>
+      );
+    case 'dairy':
+      // Cheese wedge with three punched holes
+      return (
+        <svg width={size} height={size} viewBox="0 0 24 24" aria-hidden="true">
+          <path {...outline} d="M12 2 22 20.5H2z" />
+          <circle cx="12" cy="13.5" r="1.7" fill="#fff" />
+          <circle cx="16.8" cy="17" r="1.2" fill="#fff" />
+          <circle cx="8" cy="17.3" r="1" fill="#fff" />
+        </svg>
+      );
+    case 'totalfast':
+      // Diagonal (St. Andrew's) cross — a silhouette clearly distinct from
+      // the upright strict-fast plus, for the rare day of no food at all
+      return (
+        <svg width={size} height={size} viewBox="0 0 24 24" aria-hidden="true">
+          <path {...outline} d="M2 4.5 4.5 2 12 9.5 19.5 2 22 4.5 14.5 12 22 19.5 19.5 22 12 14.5 4.5 22 2 19.5 9.5 12Z" />
+        </svg>
+      );
+    default:
+      return null;
+  }
 }
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -306,7 +359,10 @@ export default function ServiceCalendar() {
                   ? `${d.getDate()} ${MONTHS_RU_GENITIVE[month]}`
                   : `${d.getDate()} ${monthNameEn}`;
                 const dayLabel = lang === 'ru' ? DAYS_RU[jsDay] : DAYS_EN[jsDay];
-                const feastName = getFeastName(dayData.moveableFeast, lang) || getFeastName(dayData.fixedFeast, lang);
+                const feastName = [
+                  getFeastName(dayData.moveableFeast, lang),
+                  getFeastName(dayData.fixedFeast, lang),
+                ].filter(Boolean).join(' · ');
 
                 const entryText = lang === 'ru'
                   ? (event.entriesRu || event.entriesEn)
@@ -363,7 +419,7 @@ export default function ServiceCalendar() {
 
     const selectedEvent   = selectedDate ? events[selectedDate] : null;
     const selectedDayData = selectedDate
-      ? getDayData(new Date(selectedDate + 'T12:00:00'), true)
+      ? getDayData(new Date(selectedDate + 'T00:00:00'), true)
       : null;
 
     function formatSelectedDate(dateStr: string) {
@@ -428,6 +484,16 @@ export default function ServiceCalendar() {
                       {short}
                     </span>
                   )}
+                  {dayData.fast && dayData.fast !== 'fastfree' && (
+                    <span
+                      title={getFastLabel(dayData.fast, lang)}
+                      style={{ position:'absolute', top:3, left:3,
+                        display:'flex', alignItems:'center', justifyContent:'center',
+                        filter:'drop-shadow(0 1px 1px rgba(0,0,0,0.25))' }}
+                    >
+                      <FastIcon type={dayData.fast} size={22} />
+                    </span>
+                  )}
                   {dayData.nzHoliday && (
                     <span style={{ position:'absolute', top:0, right:0, width:0, height:0,
                       borderStyle:'solid', borderWidth:'0 8px 8px 0',
@@ -458,12 +524,26 @@ export default function ServiceCalendar() {
                 ✦{' '}
                 {selectedDayData.isPascha
                   ? (lang === 'ru' ? 'СВЯТАЯ ПАСХА' : 'HOLY PASCHA')
-                  : (getFeastName(selectedDayData.moveableFeast, lang) || getFeastName(selectedDayData.fixedFeast, lang))}
+                  : [
+                      getFeastName(selectedDayData.moveableFeast, lang),
+                      getFeastName(selectedDayData.fixedFeast, lang),
+                    ].filter(Boolean).join(' · ')}
               </div>
             )}
             {selectedDayData.nzHoliday && (
               <div style={{ marginTop:3, fontSize:13, color:'#2A7A6A', fontFamily:'var(--font-body)' }}>
                 🇳🇿 {selectedDayData.nzHoliday.name}
+              </div>
+            )}
+            {selectedDayData.fast && (
+              <div style={{ marginTop:3, fontSize:13, display:'flex', alignItems:'center', gap:6,
+                color: FAST_DISPLAY[selectedDayData.fast].color, fontFamily:'var(--font-body)' }}>
+                {selectedDayData.fast !== 'fastfree' && (
+                  <span style={{ display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
+                    <FastIcon type={selectedDayData.fast} size={30} />
+                  </span>
+                )}
+                {getFastLabel(selectedDayData.fast, lang)}
               </div>
             )}
             {selectedDayData.julianDateStr && (
@@ -521,6 +601,19 @@ export default function ServiceCalendar() {
               display:'inline-block', flexShrink:0 }} />
             {lang === 'ru' ? 'Есть расписание' : 'Schedule posted'}
           </span>
+        </div>
+
+        {/* Fasting legend */}
+        <div style={{ marginTop:6, display:'flex', flexWrap:'wrap', gap:'6px 16px',
+          fontSize:11, color:'var(--color-muted)', fontFamily:'var(--font-body)' }}>
+          {(['strict','oilwine','fish','dairy','totalfast'] as const).map(type => (
+            <span key={type} style={{ display:'flex', alignItems:'center', gap:5 }}>
+              <span style={{ display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
+                <FastIcon type={type} size={22} />
+              </span>
+              {getFastLabel(type, lang)}
+            </span>
+          ))}
         </div>
       </div>
     );

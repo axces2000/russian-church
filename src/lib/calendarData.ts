@@ -8,7 +8,7 @@
 //   • Fixed feasts: Julian (OS) dates, which are 13 days behind Gregorian (NS)
 //       in the 21st century.  e.g. Nativity OS Dec 25 = NS Jan 7.
 
-export type FastType = 'strict' | 'oilwine' | 'fish' | 'dairy' | 'fastfree' | null;
+export type FastType = 'strict' | 'oilwine' | 'fish' | 'dairy' | 'fastfree' | 'totalfast' | null;
 export type FeastTier = 'great' | 'pascha' | 'vigil' | 'polyeleos' | 'doxology' | 'sixverse' | 'commemoration';
 
 export interface FeastData {
@@ -65,21 +65,66 @@ export const FEAST_TIERS = {
 };
 
 export const FAST_TYPES = {
-  STRICT:    'strict'   as FastType,
-  OIL_WINE:  'oilwine'  as FastType,
-  FISH:      'fish'     as FastType,
-  DAIRY:     'dairy'    as FastType,
-  FAST_FREE: 'fastfree' as FastType,
-  NONE:      null       as FastType,
+  STRICT:     'strict'     as FastType,
+  OIL_WINE:   'oilwine'    as FastType,
+  FISH:       'fish'       as FastType,
+  DAIRY:      'dairy'      as FastType,
+  FAST_FREE:  'fastfree'   as FastType,
+  TOTAL_FAST: 'totalfast'  as FastType,
+  NONE:       null         as FastType,
 };
 
 export const FAST_PERIODS = {
-  GREAT_LENT:     "Great Lent",
-  APOSTLES:       "Apostles' Fast",
-  DORMITION:      "Dormition Fast",
-  NATIVITY:       "Nativity Fast",
-  WEEKLY_WED_FRI: "Wednesday & Friday Fast",
+  GREAT_LENT:        "Great Lent",
+  APOSTLES:          "Apostles' Fast",
+  DORMITION:         "Dormition Fast",
+  NATIVITY:          "Nativity Fast",
+  WEEKLY_WED_FRI:    "Wednesday & Friday Fast",
+  CHEESEFARE:        "Cheesefare Week",
+  PUBLICAN_PHARISEE: "Fast-Free Week (Publican & Pharisee)",
+  AFTER_PENTECOST:   "Fast-Free Week (After Pentecost)",
+  AFTER_NATIVITY:    "Fast-Free (Nativity to Theophany)",
+  BRIGHT_WEEK:       "Bright Week — Fast-Free",
 };
+
+// ── Per-weekday fast resolution for the four major fasting seasons ────────────
+// Orthodox fasting isn't a single flat rule for an entire season — the level of
+// restriction depends on the day of the week within that season. These resolvers
+// implement the standard ROCOR/Russian practice for laypeople.
+
+// Great Lent: strict Mon–Fri, oil & wine Sat–Sun.
+// (Holy Week reverts to strict throughout, including Holy Saturday — but that's
+// already handled by explicit per-day `fast` overrides on the Holy Week entries
+// in MOVEABLE_OFFSETS, which take precedence over this seasonal default.)
+function greatLentFast(dow: number): FastType {
+  return (dow === 0 || dow === 6) ? FAST_TYPES.OIL_WINE : FAST_TYPES.STRICT;
+}
+
+// Apostles' Fast: Mon/Wed/Fri strict, Tue/Thu oil & wine, Sat/Sun fish.
+// A major commemorated saint (vigil or doxology tier) relaxes the day: fish on
+// Mon/Tue/Thu, oil & wine on Wed/Fri.
+function apostlesFast(dow: number, hasVigilOrDoxologySaint: boolean): FastType {
+  if (hasVigilOrDoxologySaint) {
+    return (dow === 3 || dow === 5) ? FAST_TYPES.OIL_WINE : FAST_TYPES.FISH;
+  }
+  if (dow === 0 || dow === 6) return FAST_TYPES.FISH;
+  if (dow === 2 || dow === 4) return FAST_TYPES.OIL_WINE;
+  return FAST_TYPES.STRICT; // Mon/Wed/Fri
+}
+
+// Dormition Fast: strict Mon–Fri, oil & wine Sat–Sun.
+// (Transfiguration, Aug 6 OS, relaxes to fish via its own explicit override.)
+function dormitionFast(dow: number): FastType {
+  return (dow === 0 || dow === 6) ? FAST_TYPES.OIL_WINE : FAST_TYPES.STRICT;
+}
+
+// Nativity Fast: Mon/Wed/Fri strict, Tue/Thu oil & wine, Sat/Sun fish —
+// except from Dec 20–24 O.S., when fish is no longer allowed even on weekends.
+function nativityFast(dow: number, isStricterWindow: boolean): FastType {
+  if (dow === 0 || dow === 6) return isStricterWindow ? FAST_TYPES.OIL_WINE : FAST_TYPES.FISH;
+  if (dow === 2 || dow === 4) return FAST_TYPES.OIL_WINE;
+  return FAST_TYPES.STRICT; // Mon/Wed/Fri
+}
 
 export const JULIAN_OFFSET_DAYS = 13;
 
@@ -172,8 +217,9 @@ export const NZ_HOLIDAYS: Record<string, NZHoliday> = {
 export const MOVEABLE_OFFSETS: Record<string, FeastData> = {
   "-70": { name: "Sunday of the Publican & Pharisee", nameRu: "Неделя о мытаре и фарисее", tier: FEAST_TIERS.DOXOLOGY, fastFree: true },
   "-63": { name: "Sunday of the Prodigal Son", nameRu: "Неделя о блудном сыне", tier: FEAST_TIERS.DOXOLOGY },
-  "-56": { name: "Saturday of the Departed (Meatfare)", nameRu: "Мясопустная родительская суббота", tier: FEAST_TIERS.COMMEMORATION },
-  "-49": { name: "Meatfare Sunday", nameRu: "Неделя мясопустная (о Страшном Суде)", tier: FEAST_TIERS.DOXOLOGY },
+  "-57": { name: "Saturday of the Departed (Meatfare Saturday)", nameRu: "Мясопустная родительская суббота", tier: FEAST_TIERS.COMMEMORATION },
+  "-56": { name: "Meatfare Sunday (Sunday of the Last Judgment)", nameRu: "Неделя мясопустная (о Страшном Суде)", tier: FEAST_TIERS.DOXOLOGY },
+  "-49": { name: "Cheesefare Sunday (Forgiveness Sunday)", nameRu: "Неделя сыропустная (Прощёное воскресенье)", tier: FEAST_TIERS.DOXOLOGY, fast: FAST_TYPES.DAIRY },
   "-48": { name: "Clean Monday — Great Lent Begins", nameRu: "Чистый понедельник — начало Великого поста", fastPeriod: FAST_PERIODS.GREAT_LENT },
   "-42": { name: "Sunday of Orthodoxy (1st Sunday of Lent)", nameRu: "Неделя Торжества Православия (1-я Неделя Великого поста)", tier: FEAST_TIERS.DOXOLOGY },
   "-35": { name: "Sunday of St Gregory Palamas (2nd Sunday of Lent)", nameRu: "Неделя святителя Григория Паламы (2-я Неделя Великого поста)", tier: FEAST_TIERS.DOXOLOGY },
@@ -181,7 +227,7 @@ export const MOVEABLE_OFFSETS: Record<string, FeastData> = {
   "-21": { name: "Sunday of St John Climacus (4th Sunday of Lent)", nameRu: "Неделя преподобного Иоанна Лествичника (4-я Неделя Великого поста)", tier: FEAST_TIERS.DOXOLOGY },
   "-14": { name: "Sunday of St Mary of Egypt (5th Sunday of Lent)", nameRu: "Неделя преподобной Марии Египетской (5-я Неделя Великого поста)", tier: FEAST_TIERS.DOXOLOGY },
   "-7":  { name: "Palm Sunday — Entry into Jerusalem", nameRu: "Вход Господень в Иерусалим (Вербное воскресенье)", tier: FEAST_TIERS.GREAT, color: "palm",
-           epistle: "Phil 4:4-9", gospel: "John 12:1-18" },
+           epistle: "Phil 4:4-9", gospel: "John 12:1-18", fast: FAST_TYPES.FISH },
   "-6":  { name: "Holy Monday", nameRu: "Великий Понедельник", fast: FAST_TYPES.STRICT, holyWeek: true },
   "-5":  { name: "Holy Tuesday", nameRu: "Великий Вторник", fast: FAST_TYPES.STRICT, holyWeek: true },
   "-4":  { name: "Holy Wednesday", nameRu: "Великая Среда", fast: FAST_TYPES.STRICT, holyWeek: true },
@@ -189,7 +235,7 @@ export const MOVEABLE_OFFSETS: Record<string, FeastData> = {
            fast: FAST_TYPES.STRICT, holyWeek: true, tier: FEAST_TIERS.GREAT,
            epistle: "1 Cor 11:23-32", gospel: "John 13:1-17" },
   "-2":  { name: "Holy Friday — Veneration of the Holy Shroud", nameRu: "Великая Пятница — Вынос Святой Плащаницы",
-           fast: FAST_TYPES.STRICT, holyWeek: true, tier: FEAST_TIERS.PASCHA },
+           fast: FAST_TYPES.TOTAL_FAST, holyWeek: true, tier: FEAST_TIERS.PASCHA },
   "-1":  { name: "Holy Saturday — Descent into Hades", nameRu: "Великая Суббота — Сошествие во ад", fast: FAST_TYPES.STRICT, holyWeek: true },
   "0":   { name: "HOLY PASCHA — The Resurrection of Our Lord Jesus Christ", nameRu: "СВЯТАЯ ПАСХА — Воскресение Христово",
            tier: FEAST_TIERS.PASCHA, epistle: "Acts 1:1-8", gospel: "John 1:1-17",
@@ -346,7 +392,6 @@ export const FIXED_FEASTS: Record<string, FeastData> = {
              saint: "The Most Holy Theotokos", fastFree: true },
   "12-27": { name: "Holy Protomartyr & Archdeacon Stephen", nameRu: "Первомученика архидиакона Стефана", tier: FEAST_TIERS.POLYELEOS,
              saint: "St Stephen the First Martyr & Archdeacon", fastFree: true },
-  "12-31": { name: "Eve of Holy Theophany — Royal Hours", nameRu: "Навечерие Богоявления (Крещенский сочельник)", fast: FAST_TYPES.STRICT },
 };
 
 // ── Fasting Periods ───────────────────────────────────────────────────────────
@@ -367,16 +412,16 @@ export function getFastingPeriods(year: number, useJulian: boolean): FastingPeri
   return [
     { start: D(-48), end: D(-1),
       period: FAST_PERIODS.GREAT_LENT, defaultFast: FAST_TYPES.STRICT,
-      notes: "Strict fast Mon–Fri; oil & wine Sat–Sun" },
+      notes: "Strict fast Mon–Fri; oil & wine Sat–Sun; Holy Week returns to strict" },
     { start: D(57), end: apostlesEnd,
-      period: FAST_PERIODS.APOSTLES, defaultFast: FAST_TYPES.FISH,
-      notes: "Fish, oil & wine Mon/Tue/Thu; strict Wed & Fri" },
+      period: FAST_PERIODS.APOSTLES, defaultFast: FAST_TYPES.STRICT,
+      notes: "Strict Mon/Wed/Fri; oil & wine Tue/Thu; fish Sat/Sun" },
     { start: dormStart, end: dormEnd,
       period: FAST_PERIODS.DORMITION, defaultFast: FAST_TYPES.STRICT,
-      notes: useJulian ? "Fish on Transfiguration (Aug 19 NS)" : "Fish on Transfiguration (Aug 6)" },
+      notes: "Strict Mon–Fri; oil & wine Sat–Sun; fish on Transfiguration" },
     { start: natStart, end: natEnd,
-      period: FAST_PERIODS.NATIVITY, defaultFast: FAST_TYPES.FISH,
-      notes: "Fish Mon/Tue/Thu; stricter from Dec 20" },
+      period: FAST_PERIODS.NATIVITY, defaultFast: FAST_TYPES.STRICT,
+      notes: "Strict Mon/Wed/Fri; oil & wine Tue/Thu; fish Sat/Sun (no fish Dec 20–24)" },
     useJulian
       ? { start: new Date(year, 0, 18), end: new Date(year, 0, 18),
           period: "Eve of Theophany", defaultFast: FAST_TYPES.STRICT }
@@ -409,6 +454,27 @@ export function getToneForDate(date: Date, pascha: Date): number {
 export function getFeastName(feast: FeastData | null | undefined, lang: 'en' | 'ru'): string {
   if (!feast) return '';
   return lang === 'ru' ? (feast.nameRu || feast.name) : feast.name;
+}
+
+// ── Fasting day display metadata ────────────────────────────────────────────────
+// Bilingual labels + a small icon/colour used to mark fasting days on the calendar.
+// "fastfree" is intentionally excluded from the badge set — it represents the
+// absence of fasting, so it isn't rendered as a fasting-day marker.
+export const FAST_DISPLAY: Record<Exclude<FastType, null>, {
+  en: string; ru: string; color: string;
+}> = {
+  strict:    { en: 'Strict Fast',            ru: 'Строгий пост',                        color: '#7A1010' },
+  oilwine:   { en: 'Oil & Wine Allowed',     ru: 'Пост с растительным маслом',          color: '#A9760F' },
+  fish:      { en: 'Fish Allowed',           ru: 'Пост с рыбой',                        color: '#2A6088' },
+  dairy:     { en: 'Dairy Permitted',        ru: 'Сырная седмица',                      color: '#8A6D1A' },
+  fastfree:  { en: 'Fast-Free',              ru: 'Сплошная седмица',                    color: '#2A7A48' },
+  totalfast: { en: 'Total Abstinence',       ru: 'Воздержание от пищи',                 color: '#1C1C1C' },
+};
+
+// Full localized label for a fast type (used in the day-detail panel).
+export function getFastLabel(fast: FastType, lang: 'en' | 'ru'): string {
+  if (!fast) return '';
+  return lang === 'ru' ? FAST_DISPLAY[fast].ru : FAST_DISPLAY[fast].en;
 }
 
 // ── Main: getDayData ──────────────────────────────────────────────────────────
@@ -446,36 +512,108 @@ export function getDayData(date: Date, useJulian = true): DayData {
   let fastPeriod: string | null = null;
   const dow = date.getDay();
 
+  // A "major" commemorated saint — used for the Apostles' Fast exception rule
+  // (a vigil- or doxology-tier saint relaxes an otherwise strict weekday).
+  const hasNotableSaint = fixed?.tier === FEAST_TIERS.VIGIL || fixed?.tier === FEAST_TIERS.DOXOLOGY;
+
+  // Is this date Dec 20–24 O.S.? (the stricter tail end of the Nativity Fast,
+  // where fish is no longer allowed even on Saturday/Sunday)
+  const isNativityStricterWindow = useJulian
+    ? lookupDate.getMonth() === 11 && lookupDate.getDate() >= 20 && lookupDate.getDate() <= 24
+    : date.getMonth() === 11 && date.getDate() >= 20 && date.getDate() <= 24;
+
   const periods = [
     ...getFastingPeriods(year - 1, useJulian),
     ...getFastingPeriods(year,     useJulian),
   ];
   for (const fp of periods) {
     if (date >= fp.start && date <= fp.end) {
-      fast       = fp.defaultFast;
       fastPeriod = fp.period;
+      switch (fp.period) {
+        case FAST_PERIODS.GREAT_LENT: fast = greatLentFast(dow); break;
+        case FAST_PERIODS.APOSTLES:   fast = apostlesFast(dow, hasNotableSaint); break;
+        case FAST_PERIODS.DORMITION:  fast = dormitionFast(dow); break;
+        case FAST_PERIODS.NATIVITY:   fast = nativityFast(dow, isNativityStricterWindow); break;
+        default:                      fast = fp.defaultFast; break;
+      }
       break;
     }
   }
 
+  // Weekly baseline (outside any of the above seasons): Wed & Fri are fasting
+  // days, but the ordinary parish rule is wine & oil allowed — not xerophagy.
+  // A Great Feast of the Lord or Theotokos relaxes it further to fish. A
+  // vigil/polyeleos-tier saint stays at the wine & oil default (the Typikon
+  // allows fish for the very highest-ranked of these, but that's too granular
+  // to detect generically, so we take the safer, more conservative reading).
+  // Monday fasting is a monastic custom, not required of laypeople, so it
+  // isn't marked here.
   if (!fast && (dow === 3 || dow === 5)) {
-    fast       = FAST_TYPES.FISH;
+    const tier = fixed?.tier || moveable?.tier;
+    fast = (tier === FEAST_TIERS.GREAT || tier === FEAST_TIERS.PASCHA)
+      ? FAST_TYPES.FISH
+      : FAST_TYPES.OIL_WINE;
     fastPeriod = FAST_PERIODS.WEEKLY_WED_FRI;
   }
 
   if (moveable?.fastFree || fixed?.fastFree) fast = FAST_TYPES.FAST_FREE;
   if (moveable?.fast) fast = moveable.fast as FastType;
-  if (fixed?.fast)    fast = fixed.fast as FastType;
 
-  if (offset >= 0 && offset <= 6) fast = FAST_TYPES.FAST_FREE;
+  // Annunciation (Mar 25 O.S.) is one of only two feasts — Palm Sunday is the
+  // other — that override Holy Week's own severity when the two coincide.
+  // It still allows fish on Holy Mon/Tue/Wed/Thu, but on Holy Friday/Saturday
+  // it only relaxes the fast to wine & oil, not all the way to fish: those two
+  // days keep their exceptional strictness (Holy Friday's total abstinence
+  // among them) rather than fully yielding to the feast.
+  const isAnnunciation = fixedKey === '03-25';
+  if (moveable?.holyWeek && isAnnunciation) {
+    fast = (offset === -2 || offset === -1) ? FAST_TYPES.OIL_WINE : FAST_TYPES.FISH;
+  } else if (fixed?.fast && !moveable?.holyWeek) {
+    fast = fixed.fast as FastType;
+  }
 
-  const cheeseStart = new Date(usedPascha.getTime() - 49 * msPerDay);
-  const cheeseEnd   = new Date(usedPascha.getTime() - 43 * msPerDay);
-  if (date >= cheeseStart && date <= cheeseEnd) fast = FAST_TYPES.DAIRY;
+  // ── Fast-free weeks (override everything, including weekly Wed/Fri) ─────────
 
+  // Bright Week (Pascha through the following Saturday)
+  if (offset >= 0 && offset <= 6) {
+    fast = FAST_TYPES.FAST_FREE;
+    fastPeriod = FAST_PERIODS.BRIGHT_WEEK;
+  }
+
+  // Cheesefare Week (Maslenitsa) — the week BEFORE Great Lent begins, running
+  // Monday after Meatfare Sunday through Cheesefare/Forgiveness Sunday
+  // (offsets -55 to -49). Dairy & eggs allowed; meat already forbidden.
+  const cheeseStart = new Date(usedPascha.getTime() - 55 * msPerDay);
+  const cheeseEnd   = new Date(usedPascha.getTime() - 49 * msPerDay);
+  if (date >= cheeseStart && date <= cheeseEnd) {
+    fast = FAST_TYPES.DAIRY;
+    fastPeriod = FAST_PERIODS.CHEESEFARE;
+  }
+
+  // Fast-free week of the Publican & Pharisee (three weeks before Great Lent)
   const pfStart = new Date(usedPascha.getTime() - 70 * msPerDay);
   const pfEnd   = new Date(usedPascha.getTime() - 64 * msPerDay);
-  if (date >= pfStart && date <= pfEnd) fast = FAST_TYPES.FAST_FREE;
+  if (date >= pfStart && date <= pfEnd) {
+    fast = FAST_TYPES.FAST_FREE;
+    fastPeriod = FAST_PERIODS.PUBLICAN_PHARISEE;
+  }
+
+  // Fast-free week after Pentecost (Monday of the Holy Spirit through the
+  // Saturday before the Apostles' Fast begins)
+  if (offset >= 50 && offset <= 56) {
+    fast = FAST_TYPES.FAST_FREE;
+    fastPeriod = FAST_PERIODS.AFTER_PENTECOST;
+  }
+
+  // Fast-free stretch between Nativity and Theophany (Dec 25 O.S. – Jan 4 O.S.)
+  const isAfterNativityWindow = useJulian
+    ? date.getMonth() === 0 && date.getDate() >= 7 && date.getDate() <= 17
+    : (date.getMonth() === 11 && date.getDate() >= 26) || (date.getMonth() === 0 && date.getDate() <= 4);
+  if (isAfterNativityWindow) {
+    fast = FAST_TYPES.FAST_FREE;
+    fastPeriod = FAST_PERIODS.AFTER_NATIVITY;
+  }
+
 
   const MONTH_SHORT = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 

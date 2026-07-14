@@ -296,7 +296,7 @@ export default function CalendarAdmin() {
   // ── Day editor ────────────────────────────────────────────────────────────
   function renderEditor() {
     if (!selectedDate) return null;
-    const dayData   = getDayData(new Date(selectedDate + 'T12:00:00'), true);
+    const dayData   = getDayData(new Date(selectedDate + 'T00:00:00'), true);
     const feastName = dayData.isPascha
       ? 'HOLY PASCHA'
       : (dayData.moveableFeast?.name || dayData.fixedFeast?.name || '');
