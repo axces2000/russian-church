@@ -129,6 +129,22 @@ function FastIcon({ type, size = 14 }: { type: Exclude<FastType, null>; size?: n
   }
 }
 
+// Simple church silhouette — marks a day with a posted service schedule.
+// Uses the theme's own accent color (unlike the fasting icons, which are
+// fixed colors) so it stays visually integrated with whichever template
+// is active.
+function ChurchIcon({ size = 14 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" aria-hidden="true">
+      <path fill="var(--color-primary)" stroke="#fff" strokeWidth="1" strokeLinejoin="round"
+        d="M12,5.5 21,13 21,22 3,22 3,13 Z" />
+      <rect x="11" y="0.6" width="2" height="5.5" fill="var(--color-primary)" stroke="#fff" strokeWidth="0.8" />
+      <rect x="9.3" y="2.1" width="5.4" height="1.8" fill="var(--color-primary)" stroke="#fff" strokeWidth="0.8" />
+      <rect x="10" y="16" width="4" height="6" fill="#fff" />
+    </svg>
+  );
+}
+
 // ════════════════════════════════════════════════════════════════════════════
 export default function ServiceCalendar() {
   const { lang } = useLang();
@@ -500,8 +516,13 @@ export default function ServiceCalendar() {
                       borderColor:'transparent #2A7A6A transparent transparent' }} />
                   )}
                   {hasEntries && (
-                    <span style={{ position:'absolute', bottom:3, right:3,
-                      width:5, height:5, borderRadius:'50%', background:'var(--color-primary)' }} />
+                    <span
+                      title={lang === 'ru' ? 'Есть расписание' : 'Schedule posted'}
+                      style={{ position:'absolute', bottom:2, right:2,
+                        filter:'drop-shadow(0 1px 1px rgba(0,0,0,0.25))' }}
+                    >
+                      <ChurchIcon size={22} />
+                    </span>
                   )}
                 </button>
               );
@@ -596,9 +617,10 @@ export default function ServiceCalendar() {
               {item.label}
             </span>
           ))}
-          <span style={{ display:'flex', alignItems:'center', gap:4 }}>
-            <span style={{ width:6, height:6, borderRadius:'50%', background:'var(--color-primary)',
-              display:'inline-block', flexShrink:0 }} />
+          <span style={{ display:'flex', alignItems:'center', gap:5 }}>
+            <span style={{ display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
+              <ChurchIcon size={15} />
+            </span>
             {lang === 'ru' ? 'Есть расписание' : 'Schedule posted'}
           </span>
         </div>
