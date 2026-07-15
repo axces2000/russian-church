@@ -1,28 +1,45 @@
 // src/admin/LoginPage.tsx
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { signInWithEmailAndPassword } from 'firebase/auth';
 import { useNavigate } from 'react-router-dom';
 import { auth } from '../lib/firebase';
+import { useAuth } from '../contexts/AuthContext';
 
 export default function LoginPage() {
-  const [email, setEmail]       = useState('');
-  const [password, setPassword] = useState('');
-  const [error, setError]       = useState('');
-  const [loading, setLoading]   = useState(false);
+  const [email, setEmail]         = useState('');
+  const [password, setPassword]   = useState('');
+  const [error, setError]         = useState('');
+  const [submitting, setSubmitting] = useState(false);
   const navigate = useNavigate();
+  const { user, role, loading: authLoading } = useAuth();
+
+  // Navigate only once AuthContext has confirmed both the sign-in AND the
+  // admin-role lookup — not immediately after the sign-in promise resolves.
+  // This is what actually fixes the "have to log in twice" bug: the old
+  // code navigated straight away, before the role fetch had finished.
+  useEffect(() => {
+    if (authLoading) return;
+    if (user && role) {
+      navigate('/admin', { replace: true });
+    } else if (user && !role && submitting) {
+      // Sign-in succeeded, but this account has no admin record.
+      setError('This account does not have admin access.');
+      setSubmitting(false);
+    }
+  }, [authLoading, user, role, submitting, navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
-    setLoading(true);
+    setSubmitting(true);
     try {
       await signInWithEmailAndPassword(auth, email, password);
-      navigate('/admin');
+      // Don't navigate here — the effect above handles it once AuthContext
+      // has resolved the signed-in user's admin role.
     } catch (err: any) {
       setError('Invalid email or password.');
-    } finally {
-      setLoading(false);
+      setSubmitting(false);
     }
   };
 
@@ -79,15 +96,15 @@ export default function LoginPage() {
 
           <button
             type="submit"
-            disabled={loading}
+            disabled={submitting}
             style={{
               marginTop: 6, padding: '11px', background: '#2c1a3e',
               color: '#fff', border: 'none', borderRadius: 4,
-              fontSize: 14, fontWeight: 600, cursor: loading ? 'not-allowed' : 'pointer',
-              opacity: loading ? 0.7 : 1,
+              fontSize: 14, fontWeight: 600, cursor: submitting ? 'not-allowed' : 'pointer',
+              opacity: submitting ? 0.7 : 1,
             }}
           >
-            {loading ? 'Signing in…' : 'Sign In'}
+            {submitting ? 'Signing in…' : 'Sign In'}
           </button>
         </form>
       </div>

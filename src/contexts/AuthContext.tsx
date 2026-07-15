@@ -35,6 +35,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, async (firebaseUser) => {
+      // Every time auth state changes (including a fresh sign-in while the
+      // app is already mounted), signal that we're re-resolving role info —
+      // not just on the very first load. Without this, AuthGuard sees a
+      // stale loading=false right after login and redirects back to the
+      // login page before the admin-role lookup below has finished.
+      setLoading(true);
       setUser(firebaseUser);
 
       if (firebaseUser) {
