@@ -101,6 +101,26 @@ function getCellStyle(date: Date) {
   return { bg:'var(--color-surface,#fff)', border:'var(--color-accent,#c9a227)', text:'var(--color-text)', bold:false };
 }
 
+// Open-book silhouette — marks a day with a posted Sunday School schedule.
+// Uses the theme's own accent color so it stays visually integrated with
+// whichever template is active.
+function BookIcon({ size = 14 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" aria-hidden="true">
+      <rect x="2" y="2" width="20" height="20" rx="1.3" fill="#fff" stroke="var(--color-primary)" strokeWidth="1.4" />
+      <line x1="12" y1="2" x2="12" y2="22" stroke="var(--color-primary)" strokeWidth="1.4" />
+      <rect x="4.3" y="5.5" width="5.4" height="1.1" fill="var(--color-primary)" />
+      <rect x="4.3" y="9" width="5.4" height="1.1" fill="var(--color-primary)" />
+      <rect x="4.3" y="12.5" width="5.4" height="1.1" fill="var(--color-primary)" />
+      <rect x="4.3" y="16" width="5.4" height="1.1" fill="var(--color-primary)" />
+      <rect x="14.3" y="5.5" width="5.4" height="1.1" fill="var(--color-primary)" />
+      <rect x="14.3" y="9" width="5.4" height="1.1" fill="var(--color-primary)" />
+      <rect x="14.3" y="12.5" width="5.4" height="1.1" fill="var(--color-primary)" />
+      <rect x="14.3" y="16" width="5.4" height="1.1" fill="var(--color-primary)" />
+    </svg>
+  );
+}
+
 // ════════════════════════════════════════════════════════════════════════════
 export default function SundaySchoolCalendar() {
   const { lang } = useLang();
@@ -422,8 +442,13 @@ export default function SundaySchoolCalendar() {
                       borderColor:'transparent #2A7A6A transparent transparent' }} />
                   )}
                   {hasEntries && (
-                    <span style={{ position:'absolute', bottom:3, right:3,
-                      width:5, height:5, borderRadius:'50%', background:'var(--color-primary)' }} />
+                    <span
+                      title={lang === 'ru' ? 'Есть расписание' : 'Schedule posted'}
+                      style={{ position:'absolute', bottom:2, right:2,
+                        filter:'drop-shadow(0 1px 1px rgba(0,0,0,0.25))' }}
+                    >
+                      <BookIcon size={22} />
+                    </span>
                   )}
                 </button>
               );
@@ -487,9 +512,10 @@ export default function SundaySchoolCalendar() {
               {item.label}
             </span>
           ))}
-          <span style={{ display:'flex', alignItems:'center', gap:4 }}>
-            <span style={{ width:6, height:6, borderRadius:'50%', background:'var(--color-primary)',
-              display:'inline-block', flexShrink:0 }} />
+          <span style={{ display:'flex', alignItems:'center', gap:5 }}>
+            <span style={{ display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
+              <BookIcon size={15} />
+            </span>
             {lang === 'ru' ? 'Есть расписание' : 'Schedule posted'}
           </span>
           <span style={{ display:'flex', alignItems:'center', gap:4 }}>
