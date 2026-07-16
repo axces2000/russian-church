@@ -3,6 +3,8 @@
 // Toolbar + URL input panels both go fixed when scrolled below admin header.
 
 import React, { useEffect, useRef, useState } from 'react';
+import { ref as storageRef, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
+import { storage } from '../lib/firebase';
 
 const COLOURS = [
   { label: 'Default', value: null },
@@ -21,8 +23,8 @@ function TBtn({ active, onClick, title, children, disabled }) {
       title={title} disabled={disabled}
       style={{
         padding: '4px 8px', border: 'none', borderRadius: 4,
-        background: active ? 'var(--sand-amber)' : 'var(--sand-border)',
-        color: active ? '#0e1525' : 'var(--sand-text)',
+        background: active ? '#d4af37' : '#e0dbd0',
+        color: active ? '#0e1525' : '#2c1a3e',
         cursor: disabled ? 'not-allowed' : 'pointer',
         fontSize: 12, fontWeight: active ? 700 : 400,
         fontFamily: "'JetBrains Mono', monospace",
@@ -35,8 +37,8 @@ function TBtn({ active, onClick, title, children, disabled }) {
 const inputSty = {
   flex: 1, padding: '5px 8px', fontSize: 12,
   fontFamily: "'JetBrains Mono', monospace",
-  background: 'var(--sand-bg)', color: 'var(--sand-text)',
-  border: '0.5px solid var(--sand-border)', borderRadius: 4, outline: 'none',
+  background: '#f7f5f0', color: '#2c1a3e',
+  border: '0.5px solid #e0dbd0', borderRadius: 4, outline: 'none',
 };
 
 function MiniBtn({ onClick, label, color }) {
@@ -45,7 +47,7 @@ function MiniBtn({ onClick, label, color }) {
       onMouseDown={e => { e.preventDefault(); onClick(); }}
       style={{
         padding: '4px 10px', border: 'none', borderRadius: 4,
-        background: color || 'var(--sand-amber)', color: '#0e1525',
+        background: color || '#d4af37', color: '#0e1525',
         cursor: 'pointer', fontSize: 11,
         fontFamily: "'JetBrains Mono', monospace",
       }}
@@ -59,6 +61,7 @@ export default function RichTextEditor({ value, onChange }) {
   const containerRef = useRef(null); // outer data-rte-container div
   const sentinelRef  = useRef(null); // 1px div above the chrome block
   const chromeRef    = useRef(null); // toolbar + inputs together
+  const fileInputRef = useRef(null); // hidden <input type="file"> for image upload
 
   const [ready, setReady]           = useState(false);
   const [activeMarks, setActiveMarks] = useState({});
@@ -73,6 +76,10 @@ export default function RichTextEditor({ value, onChange }) {
   const [fixed, setFixed]           = useState(false);
   const [fixedWidth, setFixedWidth] = useState('auto');
   const [chromeHeight, setChromeHeight] = useState(0);
+  const [uploading, setUploading]     = useState(false);
+  const [resizing, setResizing]       = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [uploadError, setUploadError] = useState('');
 
   // ── Load TipTap ────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -118,7 +125,7 @@ export default function RichTextEditor({ value, onChange }) {
               style: [
                 'min-height:160px', 'padding:10px 12px', 'outline:none',
                 "font-family:Source Serif 4,Georgia,serif",
-                'font-size:13px', 'line-height:1.7', 'color:var(--sand-text)',
+                'font-size:13px', 'line-height:1.7', 'color:#2c1a3e',
               ].join(';'),
             },
           },
@@ -193,6 +200,106 @@ export default function RichTextEditor({ value, onChange }) {
     e()?.chain().focus().setImage({ src: imgUrl.trim() }).run();
     setShowImg(false); setImgUrl('');
   }
+  function triggerFileSelect() {
+    setUploadError('');
+    fileInputRef.current?.click();
+  }
+  // Resizes an image file down to maxWidth (proportionally) using a canvas,
+  // returning a Blob. If the image is already narrower than maxWidth, the
+  // original file is returned untouched — no re-encoding, no quality loss.
+  function resizeImageIfNeeded(file, maxWidth = 512) {
+    return new Promise(resolve => {
+      if (file.type === 'image/svg+xml') {
+        // Vector image — nothing to rasterize/resize.
+        resolve(file);
+        return;
+      }
+      const objectUrl = URL.createObjectURL(file);
+      const img = new Image();
+      img.onload = () => {
+        const w = img.naturalWidth, h = img.naturalHeight;
+        if (!w || w <= maxWidth) {
+          URL.revokeObjectURL(objectUrl);
+          resolve(file); // already small enough — upload as-is
+          return;
+        }
+        const newWidth  = maxWidth;
+        const newHeight = Math.round(h * (maxWidth / w));
+        const canvas = document.createElement('canvas');
+        canvas.width  = newWidth;
+        canvas.height = newHeight;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, newWidth, newHeight);
+        URL.revokeObjectURL(objectUrl);
+        // Keep PNG/GIF as PNG (preserves transparency); re-encode everything
+        // else (JPEG, WebP, etc.) as JPEG at a solid web-quality setting.
+        const outputType = (file.type === 'image/png' || file.type === 'image/gif') ? 'image/png' : 'image/jpeg';
+        canvas.toBlob(
+          blob => resolve(blob || file), // fall back to original if encoding fails
+          outputType,
+          0.88
+        );
+      };
+      img.onerror = () => {
+        URL.revokeObjectURL(objectUrl);
+        resolve(file); // couldn't load for resizing — fall back to the original
+      };
+      img.src = objectUrl;
+    });
+  }
+
+  async function handleFileSelected(ev) {
+    const file = ev.target.files?.[0];
+    ev.target.value = ''; // reset so picking the same file again still fires onChange
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      setUploadError('Please choose an image file.');
+      return;
+    }
+    if (file.size > 20 * 1024 * 1024) {
+      setUploadError('Image must be under 20 MB.');
+      return;
+    }
+
+    setUploadError('');
+    setResizing(true);
+    const uploadBody = await resizeImageIfNeeded(file, 512);
+    setResizing(false);
+
+    setUploading(true);
+    setUploadProgress(0);
+
+    const safeName = file.name.replace(/[^a-zA-Z0-9.\-_]/g, '_');
+    const path = `content-images/${Date.now()}-${Math.random().toString(36).slice(2, 8)}-${safeName}`;
+    const task = uploadBytesResumable(storageRef(storage, path), uploadBody);
+
+    task.on('state_changed',
+      snapshot => {
+        setUploadProgress(Math.round((snapshot.bytesTransferred / snapshot.totalBytes) * 100));
+      },
+      err => {
+        console.error('Image upload failed:', err);
+        const isLikelyCors = err?.code === 'storage/unknown' || err?.code === 'storage/retry-limit-exceeded';
+        setUploadError(isLikelyCors
+          ? 'Upload blocked — Storage CORS isn\u2019t configured for this domain yet (see README: "Storage CORS setup").'
+          : 'Upload failed: ' + (err?.message || 'unknown error'));
+        setUploading(false);
+      },
+      async () => {
+        try {
+          const url = await getDownloadURL(task.snapshot.ref);
+          e()?.chain().focus().setImage({ src: url }).run();
+        } catch (err) {
+          console.error('Could not get download URL:', err);
+          setUploadError('Upload succeeded but the image URL could not be retrieved.');
+        } finally {
+          setUploading(false);
+          setUploadProgress(0);
+        }
+      }
+    );
+  }
   function applyColour(val) {
     if (!val) e()?.chain().focus().unsetColor().run();
     else e()?.chain().focus().setColor(val).run();
@@ -201,13 +308,13 @@ export default function RichTextEditor({ value, onChange }) {
   // The "chrome" block = toolbar + any open input panel
   const chromeContent = (
     <div ref={chromeRef} style={{
-      background: 'var(--sand-surface)',
-      borderBottom: '0.5px solid var(--sand-border)',
+      background: '#ffffff',
+      borderBottom: '0.5px solid #e0dbd0',
       // When fixed: add borders on other sides too
       ...(fixed ? {
         position: 'fixed', top: 90, zIndex: 200,
         width: fixedWidth,
-        border: '0.5px solid var(--sand-border)',
+        border: '0.5px solid #e0dbd0',
         boxShadow: '0 3px 10px rgba(0,0,0,0.35)',
       } : {}),
     }}>
@@ -219,28 +326,38 @@ export default function RichTextEditor({ value, onChange }) {
         <TBtn active={activeMarks.h3}     onClick={() => e()?.chain().focus().toggleHeading({ level: 3 }).run()} title="H3"      disabled={!ready}>H3</TBtn>
         <TBtn active={activeMarks.h4}     onClick={() => e()?.chain().focus().toggleHeading({ level: 4 }).run()} title="H4"      disabled={!ready}>H4</TBtn>
 
-        <div style={{ width: 1, background: 'var(--sand-border)', margin: '0 2px' }} />
+        <div style={{ width: 1, background: '#e0dbd0', margin: '0 2px' }} />
 
         {/* Colour swatches */}
         <div style={{ display: 'flex', gap: 3, alignItems: 'center' }}>
           {COLOURS.map(c => (
             <button key={c.label} title={c.label}
               onMouseDown={ev => { ev.preventDefault(); applyColour(c.value); }}
-              style={{ width: 16, height: 16, borderRadius: '50%', border: '1px solid var(--sand-border)', background: c.value || 'var(--sand-text)', cursor: 'pointer', padding: 0 }}
+              style={{ width: 16, height: 16, borderRadius: '50%', border: '1px solid #e0dbd0', background: c.value || '#2c1a3e', cursor: 'pointer', padding: 0 }}
             />
           ))}
         </div>
 
-        <div style={{ width: 1, background: 'var(--sand-border)', margin: '0 2px' }} />
+        <div style={{ width: 1, background: '#e0dbd0', margin: '0 2px' }} />
 
         <TBtn active={activeMarks.link} onClick={() => { setShowLink(v => !v); setShowYT(false); setShowImg(false); }} title="Link"           disabled={!ready}>🔗</TBtn>
         <TBtn active={false}            onClick={() => { setShowYT(v => !v);   setShowLink(false); setShowImg(false); }} title="YouTube"        disabled={!ready}>▶</TBtn>
         <TBtn active={false}            onClick={() => { setShowImg(v => !v);  setShowLink(false); setShowYT(false); }}  title="Image by URL"   disabled={!ready}>🖼</TBtn>
+        <TBtn active={uploading || resizing} onClick={triggerFileSelect} title="Upload image" disabled={!ready || uploading || resizing}>
+          {resizing ? '…' : uploading ? `${uploadProgress}%` : '📤'}
+        </TBtn>
+        <input
+          ref={fileInputRef} type="file" accept="image/*"
+          style={{ display: 'none' }} onChange={handleFileSelected}
+        />
+        {uploadError && (
+          <span style={{ fontSize: 11, color: '#ef4444', display: 'flex', alignItems: 'center' }}>{uploadError}</span>
+        )}
 
         <div style={{ flex: 1 }} />
         <TBtn active={false} onClick={() => e()?.chain().focus().undo().run()} title="Undo" disabled={!ready}>↩</TBtn>
         <TBtn active={false} onClick={() => e()?.chain().focus().redo().run()} title="Redo" disabled={!ready}>↪</TBtn>
-        <div style={{ width: 1, background: 'var(--sand-border)', margin: '0 2px' }} />
+        <div style={{ width: 1, background: '#e0dbd0', margin: '0 2px' }} />
         <TBtn active={showSource} onClick={() => {
           if (!showSource) {
             setSourceHtml(e()?.getHTML() || '');
@@ -255,7 +372,7 @@ export default function RichTextEditor({ value, onChange }) {
 
       {/* ── Link input ── */}
       {showLink && (
-        <div style={{ display: 'flex', gap: 6, padding: '6px 10px', borderTop: '0.5px solid var(--sand-border)', background: 'var(--sand-surface)' }}>
+        <div style={{ display: 'flex', gap: 6, padding: '6px 10px', borderTop: '0.5px solid #e0dbd0', background: '#ffffff' }}>
           <input value={linkUrl} onChange={ev => setLinkUrl(ev.target.value)} placeholder="https://…" style={inputSty}
             onKeyDown={ev => ev.key === 'Enter' && applyLink()} autoFocus />
           <MiniBtn onClick={applyLink} label="Set link" />
@@ -265,7 +382,7 @@ export default function RichTextEditor({ value, onChange }) {
 
       {/* ── YouTube input ── */}
       {showYT && (
-        <div style={{ display: 'flex', gap: 6, padding: '6px 10px', borderTop: '0.5px solid var(--sand-border)', background: 'var(--sand-surface)' }}>
+        <div style={{ display: 'flex', gap: 6, padding: '6px 10px', borderTop: '0.5px solid #e0dbd0', background: '#ffffff' }}>
           <input value={ytUrl} onChange={ev => setYtUrl(ev.target.value)} placeholder="YouTube URL…" style={inputSty}
             onKeyDown={ev => ev.key === 'Enter' && insertYT()} autoFocus />
           <MiniBtn onClick={insertYT} label="Insert video" />
@@ -274,7 +391,7 @@ export default function RichTextEditor({ value, onChange }) {
 
       {/* ── Image URL input ── */}
       {showImg && (
-        <div style={{ display: 'flex', gap: 6, padding: '6px 10px', borderTop: '0.5px solid var(--sand-border)', background: 'var(--sand-surface)' }}>
+        <div style={{ display: 'flex', gap: 6, padding: '6px 10px', borderTop: '0.5px solid #e0dbd0', background: '#ffffff' }}>
           <input value={imgUrl} onChange={ev => setImgUrl(ev.target.value)} placeholder="Image URL (https://…)" style={inputSty}
             onKeyDown={ev => ev.key === 'Enter' && insertImg()} autoFocus />
           <MiniBtn onClick={insertImg} label="Insert image" />
@@ -283,8 +400,8 @@ export default function RichTextEditor({ value, onChange }) {
 
       {/* ── HTML source panel ── */}
       {showSource && (
-        <div style={{ borderTop: '0.5px solid var(--sand-border)', background: 'var(--sand-bg)', padding: '8px 10px' }}>
-          <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 9, color: 'var(--sand-hint)', marginBottom: 4, letterSpacing: 0.5 }}>
+        <div style={{ borderTop: '0.5px solid #e0dbd0', background: '#f7f5f0', padding: '8px 10px' }}>
+          <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 9, color: '#999', marginBottom: 4, letterSpacing: 0.5 }}>
             HTML SOURCE — edit then click &lt;/&gt; again to apply
           </div>
           <textarea
@@ -295,7 +412,7 @@ export default function RichTextEditor({ value, onChange }) {
               width: '100%', padding: '8px', resize: 'vertical',
               fontFamily: "'JetBrains Mono', monospace", fontSize: 11,
               background: '#060e1a', color: '#7dd3fc',
-              border: '0.5px solid var(--sand-border)', borderRadius: 4,
+              border: '0.5px solid #e0dbd0', borderRadius: 4,
               outline: 'none', lineHeight: 1.6,
             }}
           />
@@ -306,9 +423,9 @@ export default function RichTextEditor({ value, onChange }) {
 
   return (
     <div ref={containerRef} data-rte-container style={{
-      border: '0.5px solid var(--sand-border)',
+      border: '0.5px solid #e0dbd0',
       borderRadius: 'var(--radius-sm)',
-      background: 'var(--sand-bg)',
+      background: '#f7f5f0',
     }}>
       {/* Sentinel: when this scrolls off-screen, chrome goes fixed */}
       <div ref={sentinelRef} style={{ height: 1, pointerEvents: 'none' }} />
@@ -321,7 +438,7 @@ export default function RichTextEditor({ value, onChange }) {
 
       {/* Editor area — hidden in source mode */}
       {!ready && !showSource && (
-        <div style={{ padding: '12px', fontSize: 12, color: 'var(--sand-hint)', fontStyle: 'italic', fontFamily: 'monospace' }}>
+        <div style={{ padding: '12px', fontSize: 12, color: '#999', fontStyle: 'italic', fontFamily: 'monospace' }}>
           Loading editor…
         </div>
       )}

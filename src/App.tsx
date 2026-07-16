@@ -7,6 +7,7 @@ import { AuthProvider }        from './contexts/AuthContext';
 import { ThemeProvider }       from './contexts/ThemeContext';
 
 import AuthGuard               from './components/AuthGuard';
+import AnalyticsTracker        from './components/AnalyticsTracker';
 import SiteLayout              from './components/SiteLayout';
 import SectionPage             from './pages/SectionPage';
 import LoginPage               from './admin/LoginPage';
@@ -25,6 +26,7 @@ export default function App() {
       <AuthProvider>
         <ThemeProvider>
           <BrowserRouter>
+            <AnalyticsTracker />
             <Routes>
 
               {/* ── Public site ── */}
