@@ -64,6 +64,27 @@ export default function PageEditor() {
     }
   };
 
+  // Copy this tab's content (including image references) to the other
+  // language field. Because content is stored as HTML strings containing
+  // Firebase Storage URLs (e.g. <img src="https://firebasestorage...">),
+  // copying the string reuses the same uploaded file — nothing is
+  // re-uploaded or duplicated in Storage.
+  const handleCopyContent = () => {
+    const from = tab === 'en' ? 'English' : 'Russian';
+    const to = tab === 'en' ? 'Russian' : 'English';
+    if (!window.confirm(
+      `Copy the ${from} content to ${to}? This will overwrite the current ${to} content.\n\n` +
+      `Image references (and any other uploaded media) will be copied as-is — no files are duplicated, both languages will point to the same uploaded images.`
+    )) {
+      return;
+    }
+    if (tab === 'en') {
+      setContentRu(contentEn);
+    } else {
+      setContentEn(contentRu);
+    }
+  };
+
   if (loading) return <div style={{ padding: 60, textAlign: 'center', fontFamily: 'system-ui' }}>Loading…</div>;
   if (!page) return <div style={{ padding: 60, textAlign: 'center', fontFamily: 'system-ui' }}>Page not found.</div>;
 
@@ -133,23 +154,37 @@ export default function PageEditor() {
           </div>
         </div>
 
-        {/* Language tabs */}
-        <div style={{ display: 'flex', gap: 4, marginBottom: 0 }}>
-          {(['en', 'ru'] as Tab[]).map(t => (
-            <button
-              key={t}
-              onClick={() => setTab(t)}
-              style={{
-                padding: '10px 22px', border: 'none', cursor: 'pointer',
-                borderRadius: '6px 6px 0 0', fontSize: 13, fontWeight: tab === t ? 700 : 400,
-                background: tab === t ? '#fff' : '#e8e3dc',
-                color: tab === t ? '#2c1a3e' : '#888',
-                borderBottom: tab === t ? '2px solid #d4af37' : '2px solid transparent',
-              }}
-            >
-              {t === 'en' ? '🇬🇧 English' : '🇷🇺 Russian'}
-            </button>
-          ))}
+        {/* Language tabs + copy-content action */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 4, marginBottom: 0 }}>
+          <div style={{ display: 'flex', gap: 4 }}>
+            {(['en', 'ru'] as Tab[]).map(t => (
+              <button
+                key={t}
+                onClick={() => setTab(t)}
+                style={{
+                  padding: '10px 22px', border: 'none', cursor: 'pointer',
+                  borderRadius: '6px 6px 0 0', fontSize: 13, fontWeight: tab === t ? 700 : 400,
+                  background: tab === t ? '#fff' : '#e8e3dc',
+                  color: tab === t ? '#2c1a3e' : '#888',
+                  borderBottom: tab === t ? '2px solid #d4af37' : '2px solid transparent',
+                }}
+              >
+                {t === 'en' ? '🇬🇧 English' : '🇷🇺 Russian'}
+              </button>
+            ))}
+          </div>
+
+          <button
+            onClick={handleCopyContent}
+            title="Copies this tab's content (including image references) to the other language. No files are duplicated."
+            style={{
+              padding: '7px 14px', marginBottom: 4, border: '1px solid #d4af37',
+              borderRadius: 4, background: '#fff', color: '#8a6d1a',
+              fontSize: 12, fontWeight: 600, cursor: 'pointer',
+            }}
+          >
+            {tab === 'en' ? '⧉ Copy EN → RU' : '⧉ Copy RU → EN'}
+          </button>
         </div>
 
         {/* Editor panels */}
