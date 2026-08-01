@@ -117,6 +117,26 @@ export default function AdminDashboard() {
             icon="📄"
           />
 
+          {/* Service Schedule — superadmin or delegated admin with "services" section */}
+          {(role === 'superadmin' || (role === 'admin' && Array.isArray(allowedSections) && allowedSections.includes('services'))) && (
+            <AdminCard
+              title="Service Schedule"
+              description="Manage the services calendar"
+              to="/admin/calendar"
+              icon="🗓️"
+            />
+          )}
+
+          {/* Sunday School Schedule — superadmin or delegated admin with "sunday-school" section */}
+          {(role === 'superadmin' || (role === 'admin' && Array.isArray(allowedSections) && allowedSections.includes('sunday-school'))) && (
+            <AdminCard
+              title="Sunday School Schedule"
+              description="Manage the Sunday School calendar"
+              to="/admin/sunday-school"
+              icon="📚"
+            />
+          )}
+
           {/* Template switcher — superadmin only */}
           {role === 'superadmin' && (
             <AdminCard
