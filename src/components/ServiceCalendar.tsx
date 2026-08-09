@@ -197,30 +197,73 @@ export default function ServiceCalendar() {
         ? (event.entriesRu || event.entriesEn)
         : (event.entriesEn || event.entriesRu);
 
+      // Word's paste engine ignores font-size inherited from the ancestor
+      // <table>, so it's set directly on each <td> below rather than relying
+      // on inheritance.
+      //
+      // Two things matter for Excel here, both addressed:
+      //  1. mso-data-placement must be a CSS declaration inside style="",
+      //     like every other mso- property Office recognises — not a bare
+      //     HTML attribute. A bare attribute survives the copy but Excel's
+      //     importer never looks for it there.
+      //  2. The multi-line content must NOT be wrapped in a block element
+      //     like <p>. The date/day cell (plain inline content + <br>, no
+      //     wrapper) was the one case that came through as a single row —
+      //     a <p> block inside a <td> looks to be what makes Excel start a
+      //     new spreadsheet row per line, independent of the mso- hint.
+      // Word ignores mso-data-placement and just renders <br> as a normal
+      // line break, so none of this changes the Word result.
       const entryHtml = raw
         .split('\n')
         .filter(l => l.trim())
-        .map(line => `<p style="margin:0 0 2pt 0;line-height:1.5">${timeLineToHtml(line)}</p>`)
-        .join('');
+        .map(line => timeLineToHtml(line))
+        .join('<br style="mso-data-placement:same-cell"/>');
 
       return `
         <tr>
-          <td style="padding:7pt 10pt;width:28%;vertical-align:top;border:1pt solid black">
-            <strong>${dateLabel}</strong><br/>${dayLabel}
+          <td width="26%" valign="top" style="padding:4pt 6pt;border:1pt solid black;font-size:16pt;font-family:Calibri,Arial,sans-serif">
+            <strong>${dateLabel}</strong><br style="mso-data-placement:same-cell"/>${dayLabel}
           </td>
-          <td style="padding:7pt 10pt;vertical-align:top;border:1pt solid black">
+          <td width="74%" valign="top" style="padding:4pt 6pt;border:1pt solid black;font-size:16pt;font-family:Calibri,Arial,sans-serif">
             ${entryHtml}
           </td>
         </tr>`;
     }).join('');
 
+    // The ProgId/Generator meta tags are what Word's own "Save as Web Page"
+    // writes into its output. Their presence is what makes Word's paste
+    // engine recognise this as "from Word" and import font-size/family with
+    // full fidelity instead of silently discarding them (Merge Formatting).
+    //
+    // No @page/section wrapper here — Word's HTML import filter is old
+    // (IE-era) under the hood, and a known-good legacy export from this
+    // parish's previous site (bare fragment, no <html>/<style>, just
+    // CELLSPACING="0" CELLPADDING="0" on the <table>) pastes with no extra
+    // gaps at all. A @page rule was tried here previously to control page
+    // margins on paste, but margins on paste into an existing document were
+    // never reliable, and it has no counterpart in the version that's known
+    // to paste cleanly — likely the actual source of the extra space, so
+    // it's gone. CELLSPACING/CELLPADDING/BORDER are restored as literal
+    // table attributes (not just CSS) to match that working pattern, since
+    // Word's importer may honour its own default cell margins over CSS
+    // padding on <td> the same way it was ignoring CSS font-size.
+    // table-layout:fixed + <colgroup> still stop Word from "AutoFit to
+    // Contents" shrinking the table down around short text.
     const html = `
-      <html><head><meta charset="utf-8"/></head><body>
-        <p style="text-align:center;font-weight:bold;font-size:14pt;
+      <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word">
+      <head>
+        <meta charset="utf-8"/>
+        <meta name="ProgId" content="Word.Document"/>
+        <meta name="Generator" content="Microsoft Word 15"/>
+        <meta name="Originator" content="Microsoft Word 15"/>
+      </head>
+      <body>
+        <p style="text-align:center;font-weight:bold;font-size:22pt;
                   font-family:Calibri,Arial,sans-serif;margin:0 0 10pt 0">
           ${title}
         </p>
-        <table style="border-collapse:collapse;width:100%;font-family:Calibri,Arial,sans-serif;font-size:11pt">
+        <table border="1" cellspacing="0" cellpadding="0" style="border-collapse:collapse;width:100%;table-layout:fixed;font-family:Calibri,Arial,sans-serif;font-size:16pt">
+          <colgroup><col style="width:26%"/><col style="width:74%"/></colgroup>
           <tbody>${tableRows}</tbody>
         </table>
       </body></html>`;
