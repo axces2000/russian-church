@@ -62,17 +62,20 @@ export default function RichTextEditor({ value, onChange }) {
   const sentinelRef  = useRef(null); // 1px div above the chrome block
   const chromeRef    = useRef(null); // toolbar + inputs together
   const fileInputRef = useRef(null); // hidden <input type="file"> for image upload
+  const audioFileInputRef = useRef(null); // hidden <input type="file"> for audio upload
 
   const [ready, setReady]           = useState(false);
   const [activeMarks, setActiveMarks] = useState({});
   const [showLink, setShowLink]     = useState(false);
   const [showYT, setShowYT]         = useState(false);
   const [showImg, setShowImg]       = useState(false);
+  const [showAudio, setShowAudio]   = useState(false);
   const [showSource, setShowSource] = useState(false);
   const [sourceHtml, setSourceHtml] = useState('');
   const [linkUrl, setLinkUrl]       = useState('');
   const [ytUrl, setYtUrl]           = useState('');
   const [imgUrl, setImgUrl]         = useState('');
+  const [audioUrl, setAudioUrl]     = useState('');
   const [fixed, setFixed]           = useState(false);
   const [fixedWidth, setFixedWidth] = useState('auto');
   const [chromeHeight, setChromeHeight] = useState(0);
@@ -80,6 +83,9 @@ export default function RichTextEditor({ value, onChange }) {
   const [resizing, setResizing]       = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [uploadError, setUploadError] = useState('');
+  const [uploadingAudio, setUploadingAudio]         = useState(false);
+  const [audioUploadProgress, setAudioUploadProgress] = useState(0);
+  const [audioUploadError, setAudioUploadError]     = useState('');
 
   // ── Load TipTap ────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -87,7 +93,7 @@ export default function RichTextEditor({ value, onChange }) {
     async function init() {
       try {
         const [
-          { Editor }, { Document }, { Paragraph }, { Text },
+          { Editor, Node }, { Document }, { Paragraph }, { Text },
           { Bold }, { Italic }, { Heading }, { Color }, { TextStyle },
           { Link }, { Youtube }, { History }, { HardBreak }, { Image },
         ] = await Promise.all([
@@ -107,6 +113,31 @@ export default function RichTextEditor({ value, onChange }) {
           import('https://esm.sh/@tiptap/extension-image@2.4.0'),
         ]);
         if (destroyed || !editorRef.current) return;
+
+        // TipTap ships no official audio extension, so this defines a small
+        // custom block-atom node for embedded <audio> players. It mirrors
+        // the shape of the Image extension closely, including a setAudio
+        // command used the same way setImage is used below.
+        const Audio = Node.create({
+          name: 'audio',
+          group: 'block',
+          atom: true,
+          addAttributes() {
+            return { src: { default: null } };
+          },
+          parseHTML() {
+            return [{ tag: 'audio[src]' }];
+          },
+          renderHTML({ HTMLAttributes }) {
+            return ['audio', { controls: 'true', ...HTMLAttributes }];
+          },
+          addCommands() {
+            return {
+              setAudio: attrs => ({ commands }) => commands.insertContent({ type: this.name, attrs }),
+            };
+          },
+        });
+
         const editor = new Editor({
           element: editorRef.current,
           extensions: [
@@ -116,6 +147,7 @@ export default function RichTextEditor({ value, onChange }) {
             Link.configure({ openOnClick: false, HTMLAttributes: { target: '_blank', rel: 'noopener' } }),
             Youtube.configure({ width: '100%', height: 300 }),
             Image.configure({ inline: false, allowBase64: false }),
+            Audio,
           ],
           content: value || '',
           onUpdate: ({ editor }) => { onChange?.(editor.getHTML()); updateMarks(editor); },
@@ -203,6 +235,15 @@ export default function RichTextEditor({ value, onChange }) {
   function triggerFileSelect() {
     setUploadError('');
     fileInputRef.current?.click();
+  }
+  function insertAudio() {
+    if (!audioUrl.trim()) return;
+    e()?.chain().focus().setAudio({ src: audioUrl.trim() }).run();
+    setShowAudio(false); setAudioUrl('');
+  }
+  function triggerAudioFileSelect() {
+    setAudioUploadError('');
+    audioFileInputRef.current?.click();
   }
   // Resizes an image file down to maxWidth (proportionally) using a canvas,
   // returning a Blob. If the image is already narrower than maxWidth, the
@@ -300,6 +341,56 @@ export default function RichTextEditor({ value, onChange }) {
       }
     );
   }
+
+  async function handleAudioFileSelected(ev) {
+    const file = ev.target.files?.[0];
+    ev.target.value = ''; // reset so picking the same file again still fires onChange
+    if (!file) return;
+
+    if (!file.type.startsWith('audio/')) {
+      setAudioUploadError('Please choose an audio file (MP3, etc).');
+      return;
+    }
+    if (file.size > 100 * 1024 * 1024) {
+      setAudioUploadError('Audio file must be under 100 MB.');
+      return;
+    }
+
+    setAudioUploadError('');
+    setUploadingAudio(true);
+    setAudioUploadProgress(0);
+
+    const safeName = file.name.replace(/[^a-zA-Z0-9.\-_]/g, '_');
+    const path = `content-audio/${Date.now()}-${Math.random().toString(36).slice(2, 8)}-${safeName}`;
+    const task = uploadBytesResumable(storageRef(storage, path), file);
+
+    task.on('state_changed',
+      snapshot => {
+        setAudioUploadProgress(Math.round((snapshot.bytesTransferred / snapshot.totalBytes) * 100));
+      },
+      err => {
+        console.error('Audio upload failed:', err);
+        const isLikelyCors = err?.code === 'storage/unknown' || err?.code === 'storage/retry-limit-exceeded';
+        setAudioUploadError(isLikelyCors
+          ? 'Upload blocked — Storage CORS isn\u2019t configured for this domain yet (see README: "Storage CORS setup").'
+          : 'Upload failed: ' + (err?.message || 'unknown error'));
+        setUploadingAudio(false);
+      },
+      async () => {
+        try {
+          const url = await getDownloadURL(task.snapshot.ref);
+          e()?.chain().focus().setAudio({ src: url }).run();
+        } catch (err) {
+          console.error('Could not get download URL:', err);
+          setAudioUploadError('Upload succeeded but the audio URL could not be retrieved.');
+        } finally {
+          setUploadingAudio(false);
+          setAudioUploadProgress(0);
+        }
+      }
+    );
+  }
+
   function applyColour(val) {
     if (!val) e()?.chain().focus().unsetColor().run();
     else e()?.chain().focus().setColor(val).run();
@@ -340,9 +431,9 @@ export default function RichTextEditor({ value, onChange }) {
 
         <div style={{ width: 1, background: '#e0dbd0', margin: '0 2px' }} />
 
-        <TBtn active={activeMarks.link} onClick={() => { setShowLink(v => !v); setShowYT(false); setShowImg(false); }} title="Link"           disabled={!ready}>🔗</TBtn>
-        <TBtn active={false}            onClick={() => { setShowYT(v => !v);   setShowLink(false); setShowImg(false); }} title="YouTube"        disabled={!ready}>▶</TBtn>
-        <TBtn active={false}            onClick={() => { setShowImg(v => !v);  setShowLink(false); setShowYT(false); }}  title="Image by URL"   disabled={!ready}>🖼</TBtn>
+        <TBtn active={activeMarks.link} onClick={() => { setShowLink(v => !v); setShowYT(false); setShowImg(false); setShowAudio(false); }} title="Link"           disabled={!ready}>🔗</TBtn>
+        <TBtn active={false}            onClick={() => { setShowYT(v => !v);   setShowLink(false); setShowImg(false); setShowAudio(false); }} title="YouTube"        disabled={!ready}>▶</TBtn>
+        <TBtn active={false}            onClick={() => { setShowImg(v => !v);  setShowLink(false); setShowYT(false); setShowAudio(false); }}  title="Image by URL"   disabled={!ready}>🖼</TBtn>
         <TBtn active={uploading || resizing} onClick={triggerFileSelect} title="Upload image" disabled={!ready || uploading || resizing}>
           {resizing ? '…' : uploading ? `${uploadProgress}%` : '📤'}
         </TBtn>
@@ -352,6 +443,20 @@ export default function RichTextEditor({ value, onChange }) {
         />
         {uploadError && (
           <span style={{ fontSize: 11, color: '#ef4444', display: 'flex', alignItems: 'center' }}>{uploadError}</span>
+        )}
+
+        <div style={{ width: 1, background: '#e0dbd0', margin: '0 2px' }} />
+
+        <TBtn active={false} onClick={() => { setShowAudio(v => !v); setShowLink(false); setShowYT(false); setShowImg(false); }} title="Audio URL" disabled={!ready}>🎵</TBtn>
+        <TBtn active={uploadingAudio} onClick={triggerAudioFileSelect} title="Upload audio (MP3)" disabled={!ready || uploadingAudio}>
+          {uploadingAudio ? `${audioUploadProgress}%` : '🎧'}
+        </TBtn>
+        <input
+          ref={audioFileInputRef} type="file" accept="audio/*,.mp3"
+          style={{ display: 'none' }} onChange={handleAudioFileSelected}
+        />
+        {audioUploadError && (
+          <span style={{ fontSize: 11, color: '#ef4444', display: 'flex', alignItems: 'center' }}>{audioUploadError}</span>
         )}
 
         <div style={{ flex: 1 }} />
@@ -366,7 +471,7 @@ export default function RichTextEditor({ value, onChange }) {
             onChange?.(sourceHtml);
           }
           setShowSource(v => !v);
-          setShowLink(false); setShowYT(false); setShowImg(false);
+          setShowLink(false); setShowYT(false); setShowImg(false); setShowAudio(false);
         }} title="Edit raw HTML source" disabled={!ready}>{'</>'}</TBtn>
       </div>
 
@@ -395,6 +500,15 @@ export default function RichTextEditor({ value, onChange }) {
           <input value={imgUrl} onChange={ev => setImgUrl(ev.target.value)} placeholder="Image URL (https://…)" style={inputSty}
             onKeyDown={ev => ev.key === 'Enter' && insertImg()} autoFocus />
           <MiniBtn onClick={insertImg} label="Insert image" />
+        </div>
+      )}
+
+      {/* ── Audio URL input ── */}
+      {showAudio && (
+        <div style={{ display: 'flex', gap: 6, padding: '6px 10px', borderTop: '0.5px solid #e0dbd0', background: '#ffffff' }}>
+          <input value={audioUrl} onChange={ev => setAudioUrl(ev.target.value)} placeholder="Audio URL (https://…mp3)" style={inputSty}
+            onKeyDown={ev => ev.key === 'Enter' && insertAudio()} autoFocus />
+          <MiniBtn onClick={insertAudio} label="Insert audio" />
         </div>
       )}
 
@@ -451,6 +565,7 @@ export default function RichTextEditor({ value, onChange }) {
         .ProseMirror p  { margin:0 0 12px; min-height:1.4em; }
         .ProseMirror a  { color:#38bdf8; text-decoration:underline; }
         .ProseMirror img { max-width:100%; border-radius:6px; margin:8px 0; display:block; }
+        .ProseMirror audio { width:100%; margin:8px 0; display:block; }
         .ProseMirror iframe { width:100%; aspect-ratio:16/9; height:auto; border-radius:6px; margin:8px 0; display:block; }
         .ProseMirror div[data-youtube-video] { margin:8px 0; }
         .ProseMirror div[data-youtube-video] iframe { width:100%; aspect-ratio:16/9; height:auto; border-radius:6px; display:block; }

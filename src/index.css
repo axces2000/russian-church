@@ -57,6 +57,12 @@ h1, h2, h3, h4 {
   margin: 12px 0;
 }
 
+.rich-content audio {
+  width: 100%;
+  margin: 12px 0;
+  display: block;
+}
+
 .rich-content blockquote {
   border-left: 3px solid var(--color-accent, #c9a227);
   margin: 1.2em 0;
