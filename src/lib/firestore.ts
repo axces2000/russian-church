@@ -29,6 +29,32 @@ export interface AdminRecord {
   role: 'superadmin' | 'admin'; sections: string[] | 'all';
 }
 
+// ─── Canon Reading (weekly online canon announcement) ─────────────────────────
+export interface CanonReadingSettings {
+  zoomLink1: string;
+  zoomLink2: string;
+  wikipediaLink: string;
+  reconciliationLink: string;
+  defaultPriestName: string;
+  defaultPriestLocation: string;
+  defaultTimeNZ: string;
+}
+export interface CanonReading {
+  id: string;              // = date, "YYYY-MM-DD"
+  date: string;
+  timeNZ: string;
+  canonDedication: string; // dative case, e.g. "святителю Николаю Чудотворцу"
+  canonQuery: string;      // the admin's original search phrase, kept for reference
+  canonUrl: string;
+  canonTitle: string;
+  wikipediaLink: string;   // per-entry — may differ from settings.wikipediaLink default
+  priestName: string;
+  priestLocation: string;
+  html: string;            // the generated (and admin-editable) announcement HTML
+  status: 'draft' | 'published';
+  updatedAt: any;
+}
+
 // ─── Service Schedule ─────────────────────────────────────────────────────────
 export interface ServiceEvent {
   date: string; yearMonth: string;
@@ -241,4 +267,27 @@ export async function reorderSSEntryTypes(entries: SSEntryType[]) {
   const batch = writeBatch(db);
   entries.forEach((e, i) => batch.update(doc(db, 'ssEntryTypes', e.id), { order: i }));
   await batch.commit();
+}
+
+// ─── Canon Reading Settings (static/rarely-changing fields) ───────────────────
+export async function getCanonSettings(): Promise<CanonReadingSettings | null> {
+  const snap = await getDoc(doc(db, 'settings', 'canonReading'));
+  return snap.exists() ? (snap.data() as CanonReadingSettings) : null;
+}
+export async function updateCanonSettings(data: Partial<CanonReadingSettings>) {
+  await setDoc(doc(db, 'settings', 'canonReading'), data, { merge: true });
+}
+
+// ─── Canon Reading Entries ──────────────────────────────────────────────────────
+export function subscribeCanonReadings(cb: (items: CanonReading[]) => void): Unsubscribe {
+  return onSnapshot(
+    query(collection(db, 'canonReadings'), orderBy('date', 'desc')),
+    snap => cb(snap.docs.map(d => ({ id: d.id, ...d.data() } as CanonReading)))
+  );
+}
+export async function saveCanonReading(item: Omit<CanonReading, 'updatedAt'>) {
+  await setDoc(doc(db, 'canonReadings', item.id), { ...item, updatedAt: serverTimestamp() }, { merge: true });
+}
+export async function deleteCanonReading(id: string) {
+  await deleteDoc(doc(db, 'canonReadings', id));
 }

@@ -19,6 +19,7 @@ import SiteSettings            from './admin/SiteSettings';
 import AdminUsers              from './admin/AdminUsers';
 import CalendarAdmin           from './admin/CalendarAdmin';
 import SundaySchoolAdmin       from './admin/SundaySchoolAdmin';
+import CanonReadingAdmin       from './admin/CanonReadingAdmin';
 
 export default function App() {
   return (
@@ -55,6 +56,9 @@ export default function App() {
               } />
               <Route path="/admin/sunday-school" element={
                 <AuthGuard requireSection="sunday-school"><SundaySchoolAdmin /></AuthGuard>
+              } />
+              <Route path="/admin/canon" element={
+                <AuthGuard requireSection="services"><CanonReadingAdmin /></AuthGuard>
               } />
 
               {/* Superadmin only */}

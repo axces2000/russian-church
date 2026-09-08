@@ -7,6 +7,7 @@ import { subscribeSections, subscribePages } from '../lib/firestore';
 import type { Section, Page } from '../lib/firestore';
 import ServiceCalendar     from '../components/ServiceCalendar';
 import SundaySchoolCalendar from '../components/SundaySchoolCalendar';
+import CanonReadingNotice  from '../components/CanonReadingNotice';
 
 export default function SectionPage() {
   const { slug } = useParams<{ slug: string }>();
@@ -47,6 +48,7 @@ export default function SectionPage() {
 
       {/* ── Section-specific calendars ── */}
       {section.slug === 'services'      && <ServiceCalendar />}
+      {section.slug === 'services'      && <CanonReadingNotice />}
       {section.slug === 'sunday-school' && <SundaySchoolCalendar />}
 
       {/* Anchor links — only when more than one page */}

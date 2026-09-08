@@ -127,6 +127,16 @@ export default function AdminDashboard() {
             />
           )}
 
+          {/* Canon Reading — superadmin or delegated admin with "services" section */}
+          {(role === 'superadmin' || (role === 'admin' && Array.isArray(allowedSections) && allowedSections.includes('services'))) && (
+            <AdminCard
+              title="Canon Reading"
+              description="Weekly online canon announcement"
+              to="/admin/canon"
+              icon="📖"
+            />
+          )}
+
           {/* Sunday School Schedule — superadmin or delegated admin with "sunday-school" section */}
           {(role === 'superadmin' || (role === 'admin' && Array.isArray(allowedSections) && allowedSections.includes('sunday-school'))) && (
             <AdminCard
