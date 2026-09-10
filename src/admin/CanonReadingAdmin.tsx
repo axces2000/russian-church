@@ -1,13 +1,16 @@
 // src/admin/CanonReadingAdmin.tsx
 // Admin page for the weekly online Canon Reading announcement.
 //
-// The AI (Gemini, via the findCanonReading Cloud Function) is used ONLY to
-// locate candidate URLs — one set for the canon's own text, another for an
-// English Wikipedia article about that week's saint/feast. Everything else
-// — the announcement wording, date/day formatting — is deterministic
-// templating (src/lib/canonReadingTemplate.ts). The admin must confirm
+// The AI (Gemini) is used for two separate things: locating candidate URLs
+// (one set for the canon's own text, another for an English Wikipedia
+// article about that week's saint/feast), and — once the Russian
+// announcement is generated — translating it into English for the site's
+// English-language visitors. The announcement wording itself and its
+// date/day formatting are deterministic templating
+// (src/lib/canonReadingTemplate.ts), not AI-written. The admin must confirm
 // whichever AI-found link they pick (by clicking it) before it can be used,
-// and can always type a link in manually instead.
+// and can always type a link in manually instead. The AI translation is
+// likewise always shown for review/editing before it can be saved.
 
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
@@ -72,9 +75,11 @@ const EMPTY_DRAFT: CanonDraft = {
   canonUrl: '',
   canonTitle: '',
   wikipediaLink: '',
+  wikipediaTitle: '',
   priestName: '',
   priestLocation: '',
   html: '',
+  htmlEn: '',
   status: 'draft',
 };
 
@@ -144,11 +149,16 @@ export default function CanonReadingAdmin() {
   const [wikiManual, setWikiManual] = useState(false);
   const [wikiUseDefault, setWikiUseDefault] = useState(true);
 
+  // English translation of the generated announcement
+  const [translating, setTranslating] = useState(false);
+  const [translateError, setTranslateError] = useState('');
+
   function resetSearchState() {
     setCanonResult(null); setCanonSelectedIdx(null); setCanonConfirmed(false); setCanonManual(false);
     setWikiResult(null); setWikiSelectedIdx(null); setWikiConfirmed(false); setWikiManual(false);
     setWikiUseDefault(true);
     setSearchError('');
+    setTranslateError('');
   }
 
   function startNew() {
@@ -170,7 +180,9 @@ export default function CanonReadingAdmin() {
       id: r.id, date: r.date, timeNZ: r.timeNZ, canonDedication: r.canonDedication,
       canonQuery: r.canonQuery, canonUrl: r.canonUrl, canonTitle: r.canonTitle,
       wikipediaLink: r.wikipediaLink || settings.wikipediaLink,
+      wikipediaTitle: r.wikipediaTitle || '',
       priestName: r.priestName, priestLocation: r.priestLocation, html: r.html,
+      htmlEn: r.htmlEn || '',
       status: r.status,
     });
     // If the saved query still matches what auto-population would have
@@ -230,14 +242,14 @@ export default function CanonReadingAdmin() {
     setWikiUseDefault(true);
     setWikiManual(false);
     setWikiSelectedIdx(null);
-    setDraft(d => ({ ...d, wikipediaLink: settings.wikipediaLink }));
+    setDraft(d => ({ ...d, wikipediaLink: settings.wikipediaLink, wikipediaTitle: '' }));
   }
   function selectWikiCandidate(i: number, c: FindCandidate) {
     setWikiUseDefault(false);
     setWikiManual(false);
     setWikiSelectedIdx(i);
     setWikiConfirmed(false);
-    setDraft(d => ({ ...d, wikipediaLink: c.url }));
+    setDraft(d => ({ ...d, wikipediaLink: c.url, wikipediaTitle: c.title }));
   }
   function selectWikiManual() {
     setWikiUseDefault(false);
@@ -257,9 +269,30 @@ export default function CanonReadingAdmin() {
       zoomLink1: settings.zoomLink1,
       zoomLink2: settings.zoomLink2,
       wikipediaLink: draft.wikipediaLink || settings.wikipediaLink,
+      wikipediaTitle: draft.wikipediaTitle,
       reconciliationLink: settings.reconciliationLink,
     });
-    setDraft(d => ({ ...d, html }));
+    // Regenerating the Russian text invalidates any existing translation —
+    // clear it rather than risk publishing a mismatched EN/RU pair.
+    setDraft(d => ({ ...d, html, htmlEn: '' }));
+    setTranslateError('');
+  }
+
+  async function handleTranslate() {
+    if (!draft.html) return;
+    setTranslating(true);
+    setTranslateError('');
+    try {
+      const translateFn = httpsCallable<{ html: string }, { html: string }>(
+        functions, 'translateCanonReading', { timeout: 100000 }
+      );
+      const result = await translateFn({ html: draft.html });
+      setDraft(d => ({ ...d, htmlEn: result.data.html }));
+    } catch (e: any) {
+      setTranslateError(e.message || 'Translation failed.');
+    } finally {
+      setTranslating(false);
+    }
   }
 
   async function handleSave(status: 'draft' | 'published') {
@@ -533,9 +566,14 @@ export default function CanonReadingAdmin() {
                     I'll type a link in myself instead
                   </label>
                   {wikiManual && (
-                    <input value={draft.wikipediaLink}
-                      onChange={e => setDraft(d => ({ ...d, wikipediaLink: e.target.value }))}
-                      style={{ ...s.input, marginTop:8 }} placeholder="https://en.wikipedia.org/wiki/…" />
+                    <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10, marginTop:8 }}>
+                      <input value={draft.wikipediaTitle}
+                        onChange={e => setDraft(d => ({ ...d, wikipediaTitle: e.target.value }))}
+                        style={s.input} placeholder="Article subject, e.g. Saint Nicholas" />
+                      <input value={draft.wikipediaLink}
+                        onChange={e => setDraft(d => ({ ...d, wikipediaLink: e.target.value }))}
+                        style={s.input} placeholder="https://en.wikipedia.org/wiki/…" />
+                    </div>
                   )}
                 </div>
 
@@ -553,6 +591,39 @@ export default function CanonReadingAdmin() {
                     <div className="rich-content" style={{ border:'1px solid #e0dbd0', borderRadius:4,
                       padding:'14px 16px', background:'#fff', fontSize:14 }}
                       dangerouslySetInnerHTML={{ __html: draft.html }} />
+                  </div>
+                )}
+
+                {draft.html && (
+                  <div style={{ marginBottom:18, padding:'14px 16px', background:'#f4f6fa',
+                    borderRadius:4, border:'1px solid #dde3ec' }}>
+                    <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:10 }}>
+                      <span style={{ fontSize:12, fontWeight:600, color:'#444' }}>English Translation</span>
+                      <button onClick={handleTranslate} disabled={translating}
+                        style={{ ...s.btn, fontSize:12, opacity: translating ? 0.6 : 1 }}>
+                        {translating
+                          ? 'Translating…'
+                          : (draft.htmlEn ? '↻ Re-translate with AI' : '🌐 Translate with AI')}
+                      </button>
+                      {translateError && <span style={{ fontSize:12, color:'#e74c3c' }}>{translateError}</span>}
+                    </div>
+
+                    {draft.htmlEn ? (
+                      <>
+                        <label style={s.label}>English HTML (editable)</label>
+                        <textarea value={draft.htmlEn}
+                          onChange={e => setDraft(d => ({ ...d, htmlEn: e.target.value }))} style={s.textarea} />
+                        <label style={{ ...s.label, marginTop:12 }}>English Preview</label>
+                        <div className="rich-content" style={{ border:'1px solid #e0dbd0', borderRadius:4,
+                          padding:'14px 16px', background:'#fff', fontSize:14 }}
+                          dangerouslySetInnerHTML={{ __html: draft.htmlEn }} />
+                      </>
+                    ) : (
+                      <p style={{ margin:0, fontSize:12.5, color:'#888', fontStyle:'italic' }}>
+                        No English translation yet. Until one is added, English-language
+                        visitors will see the Russian text on the public site.
+                      </p>
+                    )}
                   </div>
                 )}
 

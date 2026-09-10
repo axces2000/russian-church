@@ -48,9 +48,12 @@ export interface CanonReading {
   canonUrl: string;
   canonTitle: string;
   wikipediaLink: string;   // per-entry — may differ from settings.wikipediaLink default
+  wikipediaTitle: string;  // e.g. "Saint Nicholas" — blank when using the default link
   priestName: string;
   priestLocation: string;
   html: string;            // the generated (and admin-editable) announcement HTML
+  htmlEn: string;          // AI-translated (and admin-editable) English version;
+                            // blank until translated — public site falls back to html
   status: 'draft' | 'published';
   updatedAt: any;
 }

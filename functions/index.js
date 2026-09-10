@@ -207,6 +207,32 @@ function buildWikiPrompt(dedication, { emphasizeSearch } = {}) {
   ].join('\n');
 }
 
+// Translates the already-generated Russian announcement into English. This
+// is a plain translation task, not a research task — no search grounding
+// needed, so it deliberately does not go through callGemini/runGroundedSearch
+// below (which always request Google Search tooling for the link-finding
+// searches).
+function buildTranslationPrompt(html) {
+  return [
+    'Translate the following Orthodox Christian parish announcement from',
+    'Russian into natural, clear English suitable for an English-speaking',
+    'parishioner. It is an HTML fragment — preserve every HTML tag,',
+    'attribute, and URL EXACTLY as written; translate only the human-',
+    'readable Russian text found between the tags. Keep the same number of',
+    '<p> elements and the same overall structure.',
+    '',
+    'Any text that is already in English (for example a line already',
+    'reading something like "The story of ... (in English):") must be left',
+    'completely unchanged — do not re-translate or alter it in any way.',
+    '',
+    'Respond with ONLY the translated HTML fragment and nothing else — no',
+    'preamble, no explanation, no markdown code fences, no commentary.',
+    '',
+    'HTML to translate:',
+    html,
+  ].join('\n');
+}
+
 // ── Gemini call (with a hard per-request timeout) ───────────────────────────
 
 async function callGemini(apiKey, prompt, timeoutMs = GEMINI_CALL_TIMEOUT_MS) {
@@ -247,6 +273,56 @@ async function callGemini(apiKey, prompt, timeoutMs = GEMINI_CALL_TIMEOUT_MS) {
   }
 
   return resp.json();
+}
+
+// Same shape as callGemini above, but deliberately without the
+// google_search tool — translation is a pure language task and doesn't
+// need it. Kept as a separate function rather than adding a flag to
+// callGemini, so the grounded-search code path above (already carefully
+// tuned) is never at risk of being touched by this.
+async function callGeminiPlain(apiKey, prompt, timeoutMs = 60000) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+  let resp;
+  try {
+    resp = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`,
+      {
+        method: 'POST',
+        headers: {
+          'x-goog-api-key': apiKey,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }],
+        }),
+        signal: controller.signal,
+      }
+    );
+  } catch (err) {
+    if (err.name === 'AbortError') {
+      console.error(`Gemini translation call timed out after ${timeoutMs}ms`);
+      throw new HttpsError('deadline-exceeded', 'The translation service took too long to respond.');
+    }
+    console.error('Network error calling Gemini API (translation):', err);
+    throw new HttpsError('unavailable', 'Could not reach the translation service.');
+  } finally {
+    clearTimeout(timeout);
+  }
+
+  if (!resp.ok) {
+    const errText = await resp.text();
+    console.error('Gemini API error (translation):', resp.status, errText);
+    throw new HttpsError('internal', 'The translation service returned an error.');
+  }
+
+  return resp.json();
+}
+
+// A model asked to "respond with only the HTML" will still sometimes wrap
+// its answer in a markdown code fence anyway — strip that defensively.
+function stripCodeFence(text) {
+  return text.replace(/^```(?:html)?\s*/i, '').replace(/```\s*$/, '').trim();
 }
 
 function extractText(candidate) {
@@ -523,3 +599,23 @@ exports.findWikiLink = onCall(
     });
   }
 );
+
+exports.translateCanonReading = onCall(
+  { secrets: [geminiApiKey], timeoutSeconds: 90 },
+  async (request) => {
+    await requireAdmin(request);
+    const html = (request.data && request.data.html || '').trim();
+    if (!html) {
+      throw new HttpsError('invalid-argument', 'Please provide the Russian announcement HTML to translate.');
+    }
+
+    const data = await callGeminiPlain(geminiApiKey.value(), buildTranslationPrompt(html));
+    const candidate = data.candidates && data.candidates[0];
+    const translated = stripCodeFence(extractText(candidate));
+    if (!translated) {
+      throw new HttpsError('internal', 'Translation came back empty — try again.');
+    }
+    return { html: translated };
+  }
+);
+

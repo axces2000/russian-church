@@ -1,9 +1,10 @@
 // src/components/CanonReadingNotice.tsx
 // Renders the nearest upcoming (or, if none, most recent) published Canon
 // Reading announcement below the Service Schedule on the public Services
-// page. The announcement body itself is Russian-only (it's produced for a
-// Russian-speaking Zoom gathering), but the section heading follows the
-// site's usual EN/RU toggle for consistency with the surrounding chrome.
+// page. The announcement is generated in Russian and optionally
+// AI-translated into English by the admin; this component shows whichever
+// matches the site's language toggle, falling back to the Russian text if
+// no English translation has been added for that entry yet.
 
 import { useEffect, useState } from 'react';
 import { useLang } from '../contexts/LangContext';
@@ -24,6 +25,7 @@ export default function CanonReadingNotice() {
   // hasn't passed yet, falling back to the most recent past one.
   const upcoming = [...published].reverse().find(r => r.date >= todayStr);
   const entry = upcoming ?? published[0];
+  const bodyHtml = lang === 'en' ? (entry.htmlEn || entry.html) : entry.html;
 
   return (
     <div style={{ marginTop:48, paddingTop:32, borderTop:'2px solid var(--color-accent)' }}>
@@ -34,7 +36,7 @@ export default function CanonReadingNotice() {
       </h2>
       <div className="rich-content" style={{ fontFamily:'var(--font-body)', fontSize:16,
         lineHeight:1.7, color:'var(--color-text)' }}
-        dangerouslySetInnerHTML={{ __html: entry.html }} />
+        dangerouslySetInnerHTML={{ __html: bodyHtml }} />
     </div>
   );
 }

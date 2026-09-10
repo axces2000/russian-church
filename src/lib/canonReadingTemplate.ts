@@ -26,6 +26,10 @@ export interface CanonReadingFields {
   zoomLink1: string;
   zoomLink2: string;
   wikipediaLink: string;
+  /** e.g. "Saint Nicholas" — the Wikipedia article's subject. Leave blank
+   *  when using the general default link (not about a specific saint/feast);
+   *  the line generated for that case reads differently — see below. */
+  wikipediaTitle: string;
   reconciliationLink: string;
 }
 
@@ -53,6 +57,13 @@ export function buildCanonReadingHtml(f: CanonReadingFields): string {
   const dayPhrase = capitalize(IN_DAY_RU[f.date.getDay()]);
   const dateStr = `${f.date.getDate()} ${MONTHS_GENITIVE_RU[f.date.getMonth()]} ${f.date.getFullYear()} года`;
   const priestPhrase = [f.priestLocation.trim(), f.priestName.trim()].filter(Boolean).join(' ');
+  // With a specific article (e.g. "Saint Nicholas"), name it directly rather
+  // than using the generic "structure of the Orthodox Church Canons" phrase,
+  // which only fits the general default link.
+  const wikiTitle = f.wikipediaTitle.trim();
+  const wikiLine = wikiTitle
+    ? `The story of ${wikiTitle} (in English):`
+    : 'The story and the structure of the Orthodox Church Canons (in English):';
 
   return [
     `<p>Дорогие друзья,</p>`,
@@ -60,7 +71,7 @@ export function buildCanonReadingHtml(f: CanonReadingFields): string {
     `<p>Чтение будет организовано через конференцию Zoom по этому адресу:<br/>${link(f.zoomLink1)}</p>`,
     `<p>Ссылка на альтернативную конференцию:<br/>${link(f.zoomLink2)}</p>`,
     `<p>Текст канона можно найти здесь:<br/>${link(f.canonUrl)}</p>`,
-    `<p>The story and the structure of the Orthodox Church Canons (in English):<br/>${link(f.wikipediaLink)}</p>`,
+    `<p>${wikiLine}<br/>${link(f.wikipediaLink)}</p>`,
     `<p>и молитвы:<br/>${link(f.reconciliationLink)}</p>`,
   ].join('\n');
 }
