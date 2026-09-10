@@ -78,6 +78,13 @@ const EMPTY_DRAFT: CanonDraft = {
   status: 'draft',
 };
 
+// Auto-suggested search phrase from the dedication field, e.g. dedication
+// "святителю Николаю Чудотворцу" -> query "канон святителю Николаю Чудотворцу".
+function autoCanonQuery(dedication: string): string {
+  const trimmed = dedication.trim();
+  return trimmed ? `канон ${trimmed}` : '';
+}
+
 // Defaults to today if today is a Saturday, otherwise the coming Saturday.
 function getUpcomingSaturday(from: Date = new Date()): string {
   const d = new Date(from.getFullYear(), from.getMonth(), from.getDate());
@@ -120,6 +127,9 @@ export default function CanonReadingAdmin() {
   const [wikiSearching, setWikiSearching] = useState(false);
   const [searchError, setSearchError] = useState('');
   const [saving, setSaving] = useState(false);
+  // Once the admin edits the search phrase directly, stop overwriting it
+  // when they change the dedication field.
+  const [canonQueryTouched, setCanonQueryTouched] = useState(false);
 
   // Canon-text candidate selection
   const [canonResult, setCanonResult] = useState<CategoryResult | null>(null);
@@ -150,6 +160,7 @@ export default function CanonReadingAdmin() {
       priestLocation: settings.defaultPriestLocation,
       wikipediaLink: settings.wikipediaLink,
     });
+    setCanonQueryTouched(false);
     resetSearchState();
     setShowForm(true);
   }
@@ -162,6 +173,10 @@ export default function CanonReadingAdmin() {
       priestName: r.priestName, priestLocation: r.priestLocation, html: r.html,
       status: r.status,
     });
+    // If the saved query still matches what auto-population would have
+    // produced, treat it as untouched so further dedication edits keep
+    // syncing it; otherwise respect the admin's earlier customization.
+    setCanonQueryTouched(r.canonQuery.trim() !== autoCanonQuery(r.canonDedication));
     resetSearchState();
     // Existing entries already have a chosen canon URL — treat it as
     // confirmed so re-editing an old entry doesn't force a fresh search.
@@ -180,7 +195,7 @@ export default function CanonReadingAdmin() {
     setCanonSearching(true);
     setWikiSearching(true);
 
-    const canonFn = httpsCallable<{ query: string }, CategoryResult>(functions, 'findCanonLink');
+    const canonFn = httpsCallable<{ query: string }, CategoryResult>(functions, 'findCanonLink', { timeout: 150000 });
     canonFn({ query: draft.canonQuery.trim() })
       .then(result => {
         setCanonResult(result.data);
@@ -194,7 +209,7 @@ export default function CanonReadingAdmin() {
       .finally(() => setCanonSearching(false));
 
     const dedication = draft.canonDedication.trim() || draft.canonQuery.trim();
-    const wikiFn = httpsCallable<{ dedication: string }, CategoryResult>(functions, 'findWikiLink');
+    const wikiFn = httpsCallable<{ dedication: string }, CategoryResult>(functions, 'findWikiLink', { timeout: 150000 });
     wikiFn({ dedication })
       .then(result => setWikiResult(result.data))
       // Wiki intentionally stays on "use default" until the admin picks
@@ -356,7 +371,14 @@ export default function CanonReadingAdmin() {
                     Canon dedication — <em>in dative case</em> (e.g. "святителю Николаю Чудотворцу", "Господу нашему Иисусу Христу")
                   </label>
                   <input value={draft.canonDedication}
-                    onChange={e => setDraft(d => ({ ...d, canonDedication: e.target.value }))}
+                    onChange={e => {
+                      const value = e.target.value;
+                      setDraft(d => ({
+                        ...d,
+                        canonDedication: value,
+                        canonQuery: canonQueryTouched ? d.canonQuery : autoCanonQuery(value),
+                      }));
+                    }}
                     style={s.input} placeholder="святителю Николаю Чудотворцу" />
                 </div>
 
@@ -378,7 +400,10 @@ export default function CanonReadingAdmin() {
                   <label style={s.label}>Search phrase (approximate — e.g. "канон Николаю Чудотворцу")</label>
                   <div style={{ display:'flex', gap:8 }}>
                     <input value={draft.canonQuery}
-                      onChange={e => setDraft(d => ({ ...d, canonQuery: e.target.value }))}
+                      onChange={e => {
+                        setCanonQueryTouched(true);
+                        setDraft(d => ({ ...d, canonQuery: e.target.value }));
+                      }}
                       style={{ ...s.input, flex:1 }} placeholder="канон Николаю Чудотворцу" />
                     <button onClick={handleSearch} disabled={canonSearching || wikiSearching || !draft.canonQuery.trim()}
                       style={{ ...s.btn, whiteSpace:'nowrap', opacity: (canonSearching || wikiSearching) ? 0.6 : 1 }}>

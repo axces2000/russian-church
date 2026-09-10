@@ -21,6 +21,10 @@ const { onCall, HttpsError } = require('firebase-functions/v2/https');
 const { defineSecret } = require('firebase-functions/params');
 const { setGlobalOptions } = require('firebase-functions/v2');
 const admin = require('firebase-admin');
+// Trailing slash forces resolution to the npm package rather than Node's
+// own deprecated built-in module of the same name (require('punycode')
+// without the slash silently resolves to core and prints a DEP0040 warning).
+const punycode = require('punycode/');
 
 admin.initializeApp();
 setGlobalOptions({ region: 'australia-southeast1' });
@@ -35,7 +39,13 @@ const geminiApiKey = defineSecret('GEMINI_API_KEY');
 // new users" — Google's own error message recommends gemini-3.6-flash.)
 const GEMINI_MODEL = 'gemini-3.6-flash';
 
-const CANON_DOMAINS = ['azbyka.ru', 'pravoslavie.ru', 'молитвослов'];
+const OTHER_CANON_DOMAINS = ['ruvera.ru', 'pravoslavie.ru'];
+// Google's search index has this Cyrillic (IDN) domain under its punycode
+// form, not the literal Unicode string — a `site:православный-молитвослов.рф`
+// filter matches nothing even though the domain is well-indexed and has
+// extensive content. Confirmed by directly searching `site:<this punycode>`
+// and finding many real, indexed canon pages on the site.
+const MOLITVOSLOV_DOMAIN_PUNYCODE = 'xn----7sbahbba0chrecjllhdbcuymu3s.xn--p1ai';
 const WIKI_DOMAIN_HINT = 'wikipedia';
 
 const NEGATIVE_TOKENS = ['NOT_FOUND', 'GENERAL'];
@@ -46,8 +56,8 @@ const NEGATIVE_TOKENS = ['NOT_FOUND', 'GENERAL'];
 // The "emphasized" retry (which forces a genuine live search rather than
 // letting the model answer quickly from memory) is inherently heavier and
 // gets a longer budget than the first attempt.
-const GEMINI_CALL_TIMEOUT_MS = 20000;
-const GEMINI_RETRY_TIMEOUT_MS = 45000;
+const GEMINI_CALL_TIMEOUT_MS = 50000;
+const GEMINI_RETRY_TIMEOUT_MS = 50000;
 
 // ── Auth ──────────────────────────────────────────────────────────────────
 async function requireAdmin(request) {
@@ -62,27 +72,114 @@ async function requireAdmin(request) {
 
 // ── Prompt builders ──────────────────────────────────────────────────────────
 
-function buildCanonPrompt(query, { emphasizeSearch } = {}) {
-  return [
+// Shared opening used by both canon prompts below.
+function canonPromptPreamble(query, emphasizeSearch) {
+  const lines = [
     'You are helping locate the online text of an Orthodox Christian canon',
     '(канон) — a specific liturgical prayer text in Church Slavonic or Russian.',
     `The admin's approximate description of the canon is: "${query}"`,
     '',
-    emphasizeSearch
-      ? 'You MUST call the Google Search tool for this before answering — do not ' +
-        'answer from memory alone, since a remembered URL is often wrong, ' +
-        'outdated, or subtly different from the real page.'
-      : 'Search the web and find web pages containing the full text of this',
-    'exact canon. Strongly prefer azbyka.ru, православный-молитвослов.рф, or',
-    'pravoslavie.ru over other sources.',
+    'You MUST use the Google Search tool for this — never answer from memory',
+    'alone. A remembered URL for a page like this is very often wrong even when',
+    'the domain and general topic are right: a mismatched file name, folder',
+    'path, or transliteration is easy to misremember and easy to miss.',
+    '',
+    "The site's actual title for this canon is often longer and more formal",
+    'than the phrase above — for example a canon described simply as',
+    '"святителю Николаю Чудотворцу" is commonly titled in full as "святителю',
+    'Николаю, архиепископу Мир Ликийских, Чудотворцу" on the actual page.',
+    'Search using the core name/subject rather than requiring an exact phrase',
+    'match, and treat a page with the same subject but a longer, more formal',
+    'title as a match.',
+  ];
+  if (emphasizeSearch) {
+    lines.push(
+      'This is a retry: your previous answer did not come with a real search',
+      'citation, meaning you likely answered from memory rather than actually',
+      'calling the tool. Call it for real this time.'
+    );
+  }
+  return lines;
+}
+
+// Searches azbyka.ru exclusively. Run as its own dedicated call (rather than
+// as one option among several in a single combined prompt) so the parish's
+// preferred, most reliable source is never simply skipped by a model that
+// chose to spend its search budget elsewhere.
+function buildAzbykaCanonPrompt(query, { emphasizeSearch } = {}) {
+  const lines = canonPromptPreamble(query, emphasizeSearch);
+  lines.push(
+    '',
+    `Search specifically on azbyka.ru — run: site:azbyka.ru ${query}`,
+    "azbyka.ru is this parish's preferred, most reliable source and should be",
+    'offered first whenever it has this canon.',
+    '',
+    'If azbyka.ru does not have this canon, respond with exactly the single',
+    'word: NOT_FOUND',
+    '',
+    'Otherwise respond in exactly this format and nothing else:',
+    'TITLE: <short Russian title of the canon>',
+    'URL: <the direct azbyka.ru URL to the page with the canon text>'
+  );
+  return lines.join('\n');
+}
+
+// Searches православный-молитвослов.рф exclusively — same rationale as the
+// dedicated azbyka search above: a specific site the admin wants reliably
+// offered as an alternative shouldn't be left to chance as just one example
+// buried inside a broader multi-site prompt.
+function buildMolitvoslovCanonPrompt(query, { emphasizeSearch } = {}) {
+  const lines = canonPromptPreamble(query, emphasizeSearch);
+  lines.push(
+    '',
+    'Search specifically on the site православный-молитвослов.рф — its',
+    "domain is indexed by Google under its punycode form, so run exactly:",
+    `  site:${MOLITVOSLOV_DOMAIN_PUNYCODE} ${query}`,
+    '(that site: value is correct even though it looks like gibberish — do',
+    'not substitute the Cyrillic domain name in the site: filter itself)',
+    '',
+    'If that site does not have this canon, respond with exactly the single',
+    'word: NOT_FOUND',
+    '',
+    'Otherwise respond in exactly this format and nothing else:',
+    'TITLE: <short Russian title of the canon>',
+    'URL: <the direct URL on that site to the page with the canon text>'
+  );
+  return lines.join('\n');
+}
+
+// Searches everywhere else. azbyka.ru and православный-молитвослов.рф are
+// deliberately out of scope here — each is covered by its own dedicated
+// search above — so this one's whole purpose is to surface further genuine
+// alternatives beyond those two.
+function buildOtherCanonSourcesPrompt(query, { emphasizeSearch } = {}) {
+  const lines = canonPromptPreamble(query, emphasizeSearch);
+  lines.push(
+    '',
+    'azbyka.ru and православный-молитвослов.рф are being checked separately',
+    'by other searches, so focus here on OTHER sites only. Run several',
+    'separate searches, each targeting a different specific site, for',
+    'example:',
+    `  site:ruvera.ru ${query}`,
+    `  site:pravoslavie.ru ${query}`,
+    `  ${query} текст канона`,
+    'plus one general (not site-restricted, but excluding azbyka.ru and',
+    'православный-молитвослов.рф) search.',
+    'The admin wants alternatives to compare against azbyka.ru, since azbyka',
+    'sometimes interleaves a Russian translation line-by-line with the Church',
+    'Slavonic text, which is harder to read than a clean, uninterrupted text.',
     '',
     'If you cannot find a specific, confident match, respond with exactly',
     'the single word: NOT_FOUND',
     '',
-    'Otherwise respond in exactly this format and nothing else:',
+    'Otherwise respond in exactly this format and nothing else, naming your',
+    'single best result (every other page you searched is already captured',
+    'automatically through your search citations, so you do not need to list',
+    'them here):',
     'TITLE: <short Russian title of the canon>',
-    'URL: <the direct URL to the page with the canon text>',
-  ].join('\n');
+    'URL: <the direct URL to the page with the canon text>'
+  );
+  return lines.join('\n');
 }
 
 function buildWikiPrompt(dedication, { emphasizeSearch } = {}) {
@@ -169,26 +266,75 @@ function isNegative(text) {
   return NEGATIVE_TOKENS.some((token) => text.trim() === token || text.includes(token));
 }
 
+// Both fetch()'s own URL normalization and the WHATWG URL parser store
+// international domains as ASCII punycode (xn--...) and non-ASCII path
+// segments as percent-encoded bytes — technically correct, but unreadable
+// for a Cyrillic site like православный-молитвослов.рф. Converts a URL
+// back to its human-readable form for display; browsers handle a literal
+// Unicode URL in an href just fine; they encode it again on click.
+function humanizeUrl(rawUrl) {
+  try {
+    const u = new URL(rawUrl);
+    const unicodeHost = punycode.toUnicode(u.hostname);
+    // decodeURI leaves structural delimiters (/ ? # & = etc.) untouched, so
+    // it's safe to run over the already-parsed path+search+hash together.
+    const rest = decodeURI(u.pathname + u.search + u.hash);
+    return `${u.protocol}//${unicodeHost}${u.port ? ':' + u.port : ''}${rest}`;
+  } catch (err) {
+    console.error('Could not humanize URL for display:', rawUrl, err.message);
+    return rawUrl; // fall back to whatever we had rather than crash
+  }
+}
+
 // Grounding citations come back as Google-hosted redirect links
 // (vertexaisearch.cloud.google.com/grounding-api-redirect/...) rather than
 // the real page URL. They work fine to click, but look wrong to publish in
 // a public announcement — so resolve the redirect server-side and hand back
-// the actual destination instead.
+// the actual (human-readable) destination instead.
 async function resolveFinalUrl(url) {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 8000);
   try {
     const res = await fetch(url, { method: 'HEAD', redirect: 'follow', signal: controller.signal });
-    if (res.url) return res.url;
+    if (res.url) return humanizeUrl(res.url);
     throw new Error('empty response.url');
   } catch (err) {
     // Some servers reject HEAD (405, etc.) — fall back to a GET.
     try {
       const res = await fetch(url, { method: 'GET', redirect: 'follow', signal: controller.signal });
-      return res.url || url;
+      return humanizeUrl(res.url || url);
     } catch (err2) {
       console.error('Could not resolve redirect for', url, err2.message);
-      return url; // give up gracefully — better an ugly link than a crash
+      return humanizeUrl(url); // give up gracefully — better an ugly link than a crash
+    }
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+// Confirms a URL genuinely loads. Used only on the last-resort candidate
+// that came from the model's own text rather than a real search citation —
+// a guessed URL for a page like this is often subtly wrong (a mismatched
+// file name, folder path, or transliteration) even when the domain and
+// general topic are right, and a broken link is worse than admitting no
+// confident match was found.
+async function urlLooksReachable(url) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 8000);
+  const headers = { 'User-Agent': 'Mozilla/5.0 (compatible; ChurchSiteLinkCheck/1.0)' };
+  try {
+    const res = await fetch(url, { method: 'HEAD', redirect: 'follow', headers, signal: controller.signal });
+    if (res.status === 405 || res.status === 501) {
+      throw new Error('HEAD not supported, falling back to GET');
+    }
+    return res.ok;
+  } catch {
+    try {
+      const res = await fetch(url, { method: 'GET', redirect: 'follow', headers, signal: controller.signal });
+      return res.ok;
+    } catch (err) {
+      console.error('Could not verify guessed URL', url, err.message);
+      return false;
     }
   } finally {
     clearTimeout(timeout);
@@ -220,13 +366,27 @@ async function runGroundedSearch(apiKey, promptBuilder, options = {}) {
   let text = extractText(candidate);
   let chunks = filterChunks(extractGroundingChunks(candidate));
 
-  if (chunks.length === 0 && text && !isNegative(text)) {
+  // Retry whenever the first attempt came back with no real search
+  // citation at all — whether it claimed to have found something or
+  // claimed it didn't, neither is trustworthy without evidence the tool
+  // was actually invoked. This matters for two separate reasons: the model
+  // can sometimes just answer from memory despite being told not to, and
+  // separately, Gemini's grounding metadata is documented to occasionally
+  // come back completely empty even when the search tool genuinely was
+  // called (an upstream Google issue, not specific to this app). A
+  // "NOT_FOUND" backed by zero evidence a search ever ran is exactly as
+  // unreliable as an uncited "here's a URL" claim, so both get the same
+  // forced-search retry before the answer is accepted. Once the retry
+  // produces any text, it supersedes the original uncited answer — its
+  // much stronger "you MUST call the tool" instruction makes it the more
+  // trustworthy of the two either way.
+  if (chunks.length === 0 && text) {
     console.log('No grounding citations on first attempt — retrying with emphasis.');
     data = await callGemini(apiKey, promptBuilder({ emphasizeSearch: true }), GEMINI_RETRY_TIMEOUT_MS);
     candidate = data.candidates && data.candidates[0];
     const retryText = extractText(candidate);
     const retryChunks = filterChunks(extractGroundingChunks(candidate));
-    if (retryChunks.length > 0) {
+    if (retryText) {
       text = retryText;
       chunks = retryChunks;
     }
@@ -263,15 +423,22 @@ async function runGroundedSearch(apiKey, promptBuilder, options = {}) {
     }
   }
 
-  // No usable grounding citation — fall back to the model's own text as a
-  // single unverified candidate, so the UI can warn strongly about it.
+  // No usable grounding citation — the model's own text is our only lead.
+  // It's not backed by a real search result, so confirm it at least loads
+  // before ever showing it to the admin.
   const urlMatch = text.match(/URL:\s*(\S+)/i);
   if (!urlMatch) {
     return { found: false, rawText: text };
   }
+  const guessedUrl = urlMatch[1].trim();
+  const reachable = await urlLooksReachable(guessedUrl);
+  if (!reachable) {
+    console.log('Guessed URL failed reachability check, discarding:', guessedUrl);
+    return { found: false, rawText: text };
+  }
   return {
     found: true,
-    candidates: [{ title: fallbackTitle, url: urlMatch[1].trim(), verified: false }],
+    candidates: [{ title: fallbackTitle, url: humanizeUrl(guessedUrl), verified: false }],
     rawText: text,
   };
 }
@@ -279,22 +446,71 @@ async function runGroundedSearch(apiKey, promptBuilder, options = {}) {
 // ── Callable functions ───────────────────────────────────────────────────────
 
 exports.findCanonLink = onCall(
-  { secrets: [geminiApiKey], timeoutSeconds: 120 },
+  { secrets: [geminiApiKey], timeoutSeconds: 150 },
   async (request) => {
     await requireAdmin(request);
     const query = (request.data && request.data.query || '').trim();
     if (!query) {
       throw new HttpsError('invalid-argument', 'Please provide a canon name or topic.');
     }
-    return runGroundedSearch(geminiApiKey.value(), (opts) => buildCanonPrompt(query, opts), {
-      domainPreference: CANON_DOMAINS,
-      limit: 4,
-    });
+
+    // Three independent searches, run in parallel: one scoped exclusively
+    // to azbyka.ru (this parish's preferred, most reliable source — wanted
+    // first whenever it has the text), one to православный-молитвослов.рф,
+    // and one covering everything else. Keeping them separate means neither
+    // of the two named sites' inclusion depends on a single combined search
+    // happening to remember to check it — see the comments on
+    // buildAzbykaCanonPrompt / buildMolitvoslovCanonPrompt above.
+    //
+    // Promise.allSettled (not Promise.all) is deliberate: each branch can
+    // independently take up to ~100s in the worst case (an initial Gemini
+    // call, then a retry, each with their own budget). If one of them times
+    // out or errors, that must not wipe out a result the other branches did
+    // manage to find — better to show partial results than nothing at all.
+    const settled = await Promise.allSettled([
+      runGroundedSearch(geminiApiKey.value(), (opts) => buildAzbykaCanonPrompt(query, opts), {
+        limit: 1,
+      }),
+      runGroundedSearch(geminiApiKey.value(), (opts) => buildMolitvoslovCanonPrompt(query, opts), {
+        limit: 1,
+      }),
+      runGroundedSearch(geminiApiKey.value(), (opts) => buildOtherCanonSourcesPrompt(query, opts), {
+        domainPreference: OTHER_CANON_DOMAINS,
+        limit: 4,
+      }),
+    ]);
+    const toResult = (outcome, label) => {
+      if (outcome.status === 'fulfilled') return outcome.value;
+      console.error(`${label} canon search failed:`, outcome.reason && outcome.reason.message);
+      return { found: false };
+    };
+    const azbykaResult = toResult(settled[0], 'azbyka');
+    const molitvoslovResult = toResult(settled[1], 'molitvoslov');
+    const otherResult = toResult(settled[2], 'other-sources');
+
+    const candidates = [];
+    const seen = new Set();
+    for (const result of [azbykaResult, molitvoslovResult, otherResult]) {
+      if (!result.found || !result.candidates) continue;
+      for (const c of result.candidates) {
+        const key = c.url.toLowerCase();
+        if (seen.has(key)) continue;
+        seen.add(key);
+        candidates.push(c);
+      }
+    }
+
+    if (candidates.length === 0) {
+      const rawText = [azbykaResult.rawText, molitvoslovResult.rawText, otherResult.rawText]
+        .filter(Boolean).join(' / ');
+      return { found: false, rawText: rawText || undefined };
+    }
+    return { found: true, candidates: candidates.slice(0, 6) };
   }
 );
 
 exports.findWikiLink = onCall(
-  { secrets: [geminiApiKey], timeoutSeconds: 120 },
+  { secrets: [geminiApiKey], timeoutSeconds: 150 },
   async (request) => {
     await requireAdmin(request);
     const dedication = (request.data && request.data.dedication || '').trim();
