@@ -24,7 +24,7 @@ import {
   deleteCanonReading,
 } from '../lib/firestore';
 import type { CanonReadingSettings, CanonReading } from '../lib/firestore';
-import { buildCanonReadingHtml } from '../lib/canonReadingTemplate';
+import { buildCanonReadingHtml, htmlToPlainText } from '../lib/canonReadingTemplate';
 
 // ── Styles (matches CalendarAdmin.tsx conventions) ──────────────────────────
 const s = {
@@ -153,12 +153,20 @@ export default function CanonReadingAdmin() {
   const [translating, setTranslating] = useState(false);
   const [translateError, setTranslateError] = useState('');
 
+  // Moscow-audience version for Fr. Alexei — generated on demand for
+  // copy/paste convenience only. Deliberately NOT part of `draft`/Firestore;
+  // it must never be what gets saved or published to the public NZ site.
+  const [moscowText, setMoscowText] = useState('');
+  const [moscowCopied, setMoscowCopied] = useState(false);
+
   function resetSearchState() {
     setCanonResult(null); setCanonSelectedIdx(null); setCanonConfirmed(false); setCanonManual(false);
     setWikiResult(null); setWikiSelectedIdx(null); setWikiConfirmed(false); setWikiManual(false);
     setWikiUseDefault(true);
     setSearchError('');
     setTranslateError('');
+    setMoscowText('');
+    setMoscowCopied(false);
   }
 
   function startNew() {
@@ -292,6 +300,39 @@ export default function CanonReadingAdmin() {
       setTranslateError(e.message || 'Translation failed.');
     } finally {
       setTranslating(false);
+    }
+  }
+
+  // Generated fresh from the same source fields as the NZ version, purely
+  // for copy/paste to Fr. Alexei — never saved, never part of what gets
+  // published on the public site.
+  function handleGenerateMoscowVersion() {
+    if (!draft.date || !draft.canonUrl) return;
+    setMoscowCopied(false);
+    const html = buildCanonReadingHtml({
+      date: new Date(draft.date + 'T12:00:00'),
+      timeNZ: draft.timeNZ,
+      canonDedication: draft.canonDedication,
+      priestName: draft.priestName,
+      priestLocation: draft.priestLocation,
+      canonUrl: draft.canonUrl,
+      zoomLink1: settings.zoomLink1,
+      zoomLink2: settings.zoomLink2,
+      wikipediaLink: draft.wikipediaLink || settings.wikipediaLink,
+      wikipediaTitle: draft.wikipediaTitle,
+      reconciliationLink: settings.reconciliationLink,
+    }, 'moscow');
+    setMoscowText(htmlToPlainText(html));
+  }
+
+  async function handleCopyMoscow() {
+    try {
+      await navigator.clipboard.writeText(moscowText);
+      setMoscowCopied(true);
+      setTimeout(() => setMoscowCopied(false), 2500);
+    } catch {
+      // Clipboard API unavailable/denied — the text is still visible in
+      // the box below for the admin to select and copy manually.
     }
   }
 
@@ -623,6 +664,34 @@ export default function CanonReadingAdmin() {
                         No English translation yet. Until one is added, English-language
                         visitors will see the Russian text on the public site.
                       </p>
+                    )}
+                  </div>
+                )}
+
+                {draft.html && (
+                  <div style={{ marginBottom:18, padding:'14px 16px', background:'#fbf3e3',
+                    borderRadius:4, border:'1px solid #e8ddc0' }}>
+                    <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:6, flexWrap:'wrap' }}>
+                      <span style={{ fontSize:12, fontWeight:600, color:'#6b5228' }}>
+                        For Fr. Alexei (Moscow time) — reference only, never saved or published
+                      </span>
+                    </div>
+                    <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:10, flexWrap:'wrap' }}>
+                      <button onClick={handleGenerateMoscowVersion} style={{ ...s.btn, fontSize:12 }}>
+                        {moscowText ? '↻ Regenerate' : '🕐 Generate Moscow version'}
+                      </button>
+                      {moscowText && (
+                        <button onClick={handleCopyMoscow}
+                          style={{ ...s.btn, fontSize:12,
+                            background: moscowCopied ? '#2c1a3e' : '#fff',
+                            color: moscowCopied ? '#d4af37' : '#2c1a3e' }}>
+                          {moscowCopied ? '✓ Copied!' : '📋 Copy text'}
+                        </button>
+                      )}
+                    </div>
+                    {moscowText && (
+                      <textarea readOnly value={moscowText}
+                        style={{ ...s.textarea, minHeight:160, background:'#fffdf6' }} />
                     )}
                   </div>
                 )}
