@@ -141,9 +141,16 @@ export function buildCanonReadingHtml(f: CanonReadingFields, audience: CanonAudi
 
   if (audience === 'moscow') {
     const moscow = toMoscow(f.date, f.timeNZ);
-    // noon avoids any DST/date-boundary ambiguity when reading back getDay()
+    // Noon avoids any date-boundary ambiguity when constructing this. Read
+    // back with getUTCDay() (not getDay()) — deliberate: this timestamp was
+    // built with Date.UTC(), so it must be read in the same UTC frame.
+    // Using local-timezone-dependent getDay() instead is exactly the kind
+    // of bug that stays invisible when testing from a server in UTC, and
+    // only appears for someone running the admin panel from NZ itself,
+    // where the +12/+13 hour local offset pushes a UTC-noon timestamp into
+    // the next calendar day.
     const localNoon = new Date(Date.UTC(moscow.year, moscow.month, moscow.day, 12));
-    dayPhrase = capitalize(IN_DAY_RU[localNoon.getDay()]);
+    dayPhrase = capitalize(IN_DAY_RU[localNoon.getUTCDay()]);
     dateStr = `${moscow.day} ${MONTHS_GENITIVE_RU[moscow.month]} ${moscow.year} года`;
     timeStr = `${String(moscow.hour).padStart(2, '0')}:${String(moscow.minute).padStart(2, '0')}`;
     timeZonePhrase = 'по московскому времени';

@@ -37,6 +37,14 @@ export default function SectionPage() {
   const sectionTitle = lang === 'en' ? section.nameEn : section.nameRu;
   const multiPage    = pages.length > 1;
 
+  // Services and Sunday School render their own dedicated components
+  // (calendars / the Canon Reading notice) instead of static Pages, so an
+  // empty `pages` array there doesn't mean the section is actually empty —
+  // it just means there's no separate static page underneath the special
+  // content. The "no content yet" fallback below should only ever apply to
+  // ordinary sections that rely purely on static pages.
+  const hasSpecialContent = section.slug === 'services' || section.slug === 'sunday-school';
+
   return (
     <div style={{ maxWidth:960, margin:'0 auto', padding:'48px 24px 80px' }}>
 
@@ -87,7 +95,7 @@ export default function SectionPage() {
         </article>
       ))}
 
-      {pages.length === 0 && (
+      {pages.length === 0 && !hasSpecialContent && (
         <p style={{ color:'var(--color-muted)', fontStyle:'italic' }}>
           {lang === 'en' ? 'No content yet.' : 'Содержимое пока не добавлено.'}
         </p>
