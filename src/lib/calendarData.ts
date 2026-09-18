@@ -205,6 +205,19 @@ function mondayisePair(first: Date, second: Date): [Date, Date] {
   return [obsFirst, obsSecond];
 }
 
+// Nearest-Monday rule used for NZ provincial anniversary days (e.g. Wellington
+// Anniversary Day): observed on whichever Monday is closest to the actual
+// date. Sun -> the next day; Tue/Wed/Thu -> the preceding Monday (1-3 days
+// back, the nearer direction); Fri/Sat -> the following Monday (2-3 days
+// forward, nearer than going back 4-5 days). Verified against the known
+// official dates: Wellington Anniversary Day was Mon 22 Jan 2024 (actual
+// date itself a Monday), Mon 20 Jan 2025 (actual date a Wednesday), and
+// Mon 19 Jan 2026 (actual date a Thursday).
+function nearestMonday(date: Date): Date {
+  const OFFSET_BY_DOW = [1, 0, -1, -2, -3, 3, 2]; // Sun..Sat -> days to add
+  return addDays(date, OFFSET_BY_DOW[date.getDay()]);
+}
+
 function firstMondayOfMonth(year: number, monthIndex0: number): Date {
   const d = new Date(year, monthIndex0, 1);
   return addDays(d, (8 - d.getDay()) % 7);
@@ -265,6 +278,9 @@ function buildNZHolidays(fromYear: number, toYear: number): Record<string, NZHol
     const [nyd, dayAfter] = mondayisePair(nydActual, dayAfterActual);
     set(nyd, "New Year's Day", nyd.getTime() !== nydActual.getTime());
     set(dayAfter, "Day after New Year's Day", dayAfter.getTime() !== dayAfterActual.getTime());
+
+    // Wellington provincial anniversary — Monday nearest to 22 January.
+    set(nearestMonday(new Date(year, 0, 22)), 'Wellington Anniversary Day', false);
 
     const waitangiActual = new Date(year, 1, 6);
     const waitangi = mondayiseSingle(waitangiActual);
