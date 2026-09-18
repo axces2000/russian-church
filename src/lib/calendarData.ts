@@ -148,70 +148,154 @@ export function getPascha(year: number): Date {
 }
 
 // ── NZ Public Holidays ────────────────────────────────────────────────────────
-export const NZ_HOLIDAYS: Record<string, NZHoliday> = {
-  "2024-01-01": { name: "New Year's Day" },
-  "2024-01-02": { name: "Day after New Year's Day" },
-  "2024-02-06": { name: "Waitangi Day" },
-  "2024-03-29": { name: "Good Friday (Western)" },
-  "2024-04-01": { name: "Easter Monday (Western)" },
-  "2024-04-25": { name: "ANZAC Day" },
-  "2024-06-03": { name: "King's Birthday" },
-  "2024-06-28": { name: "Matariki" },
-  "2024-10-28": { name: "Labour Day" },
-  "2024-12-25": { name: "Christmas Day" },
-  "2024-12-26": { name: "Boxing Day" },
-  "2025-01-01": { name: "New Year's Day" },
-  "2025-01-02": { name: "Day after New Year's Day" },
-  "2025-02-06": { name: "Waitangi Day" },
-  "2025-04-18": { name: "Good Friday (Western)" },
-  "2025-04-21": { name: "Easter Monday (Western)" },
-  "2025-04-25": { name: "ANZAC Day" },
-  "2025-06-02": { name: "King's Birthday" },
-  "2025-06-20": { name: "Matariki" },
-  "2025-10-27": { name: "Labour Day" },
-  "2025-12-25": { name: "Christmas Day" },
-  "2025-12-26": { name: "Boxing Day" },
-  "2026-01-01": { name: "New Year's Day" },
-  "2026-01-02": { name: "Day after New Year's Day" },
-  "2026-02-06": { name: "Waitangi Day" },
-  "2026-04-03": { name: "Good Friday (Western)" },
-  "2026-04-06": { name: "Easter Monday (Western)" },
-  "2026-04-25": { name: "ANZAC Day" },
-  "2026-06-01": { name: "King's Birthday" },
-  "2026-07-10": { name: "Matariki" },
-  "2026-10-26": { name: "Labour Day" },
-  "2026-12-25": { name: "Christmas Day" },
-  "2026-12-26": { name: "Boxing Day" },
-  "2027-01-01": { name: "New Year's Day" },
-  "2027-01-02": { name: "Day after New Year's Day" },
-  "2027-02-06": { name: "Waitangi Day" },
-  "2027-04-25": { name: "ANZAC Day" },
-  "2027-06-07": { name: "King's Birthday" },
-  "2027-06-25": { name: "Matariki" },
-  "2027-10-25": { name: "Labour Day" },
-  "2027-12-25": { name: "Christmas Day" },
-  "2027-12-27": { name: "Boxing Day (observed)" },
-  "2028-01-01": { name: "New Year's Day" },
-  "2028-02-06": { name: "Waitangi Day" },
-  "2028-04-25": { name: "ANZAC Day" },
-  "2028-06-05": { name: "King's Birthday" },
-  "2028-07-14": { name: "Matariki" },
-  "2029-07-06": { name: "Matariki" },
-  "2030-06-21": { name: "Matariki" },
-  "2028-10-23": { name: "Labour Day" },
-  "2028-12-25": { name: "Christmas Day" },
-  "2028-12-26": { name: "Boxing Day" },
-  "2029-01-01": { name: "New Year's Day" },
-  "2029-02-06": { name: "Waitangi Day" },
-  "2029-04-25": { name: "ANZAC Day" },
-  "2029-12-25": { name: "Christmas Day" },
-  "2029-12-26": { name: "Boxing Day" },
-  "2030-01-01": { name: "New Year's Day" },
-  "2030-02-06": { name: "Waitangi Day" },
-  "2030-04-25": { name: "ANZAC Day" },
-  "2030-12-25": { name: "Christmas Day" },
-  "2030-12-26": { name: "Boxing Day" },
+// Computed programmatically instead of hand-typed, so "Mondayised" dates can
+// never silently go stale the way the old hard-coded table did. Confirmed
+// bugs in the old table this replaces:
+//   • Boxing Day 2026 falls on a Saturday — the Mondayised public holiday on
+//     Mon 28 Dec 2026 was simply missing.
+//   • ANZAC Day 2026 falls on a Saturday — the Mondayised holiday on
+//     Mon 27 Apr 2026 was missing too.
+//   • Several other entries were quietly wrong/missing further out (2027
+//     Day-after-New-Year, Waitangi Day and ANZAC Day were never moved off
+//     their weekend dates; Good Friday/Easter Monday were missing entirely
+//     for 2027-2030; King's Birthday/Labour Day were missing for 2029-2030;
+//     2028 New Year's Day was missing its Mondayised date and "Day after"
+//     entry altogether).
+//
+// NZ "Mondayisation" rules (Holidays Act 2003 s 45A, extended to Waitangi
+// Day and ANZAC Day by the 2013 amendment, in effect from 2014):
+//   • New Year's Day, Day after New Year's Day, Waitangi Day, ANZAC Day,
+//     Christmas Day and Boxing Day all move to the nearest weekday when
+//     they fall on a Saturday or Sunday.
+//   • New Year's Day/Day-after and Christmas/Boxing Day are handled as
+//     PAIRS: if Mondayising the second holiday would land it on the same
+//     day as the first, it bumps one day further (Monday -> Tuesday) —
+//     e.g. Christmas Day on a Sunday moves to Monday, so Boxing Day (the
+//     following Monday) moves on to Tuesday instead of clashing.
+//   • King's Birthday (1st Monday in June) and Labour Day (4th Monday in
+//     October) are always on a Monday by definition — nothing to move.
+//   • Good Friday / Easter Monday use WESTERN (Gregorian) Easter, a
+//     different calculation from the Orthodox Pascha computed above, so
+//     they're computed separately here rather than reusing
+//     computeOrthodoxPascha.
+//   • Matariki has no formula — its dates are individually gazetted by the
+//     government (published by MBIE for 2022-2052) — so it stays a literal
+//     lookup, same as the fixed feast tables elsewhere in this file.
+
+function addDays(date: Date, days: number): Date {
+  const d = new Date(date);
+  d.setDate(d.getDate() + days);
+  return d;
+}
+
+// Sat -> next Monday (+2), Sun -> next Monday (+1), weekday -> unchanged.
+function mondayiseSingle(date: Date): Date {
+  const dow = date.getDay();
+  if (dow === 6) return addDays(date, 2);
+  if (dow === 0) return addDays(date, 1);
+  return date;
+}
+
+// Paired Mondayisation for two adjacent-day holidays (New Year's Day / Day
+// after New Year's Day, and Christmas Day / Boxing Day) — see comment above.
+function mondayisePair(first: Date, second: Date): [Date, Date] {
+  const obsFirst = mondayiseSingle(first);
+  let obsSecond = mondayiseSingle(second);
+  if (obsSecond.getTime() === obsFirst.getTime()) obsSecond = addDays(obsSecond, 1);
+  return [obsFirst, obsSecond];
+}
+
+function firstMondayOfMonth(year: number, monthIndex0: number): Date {
+  const d = new Date(year, monthIndex0, 1);
+  return addDays(d, (8 - d.getDay()) % 7);
+}
+function nthMondayOfMonth(year: number, monthIndex0: number, n: number): Date {
+  return addDays(firstMondayOfMonth(year, monthIndex0), (n - 1) * 7);
+}
+
+// Western (Gregorian) Easter — Anonymous Gregorian algorithm
+// (Meeus/Jones/Butcher). Verified against the dates the old table already
+// had hard-coded for 2024-2026 (all matched exactly) before being trusted
+// to fill in the years the old table left blank.
+function computeWesternEaster(year: number): Date {
+  const a = year % 19;
+  const b = Math.floor(year / 100);
+  const c = year % 100;
+  const d = Math.floor(b / 4);
+  const e = b % 4;
+  const f = Math.floor((b + 8) / 25);
+  const g = Math.floor((b - f + 1) / 3);
+  const h = (19 * a + b - d - g + 15) % 30;
+  const i = Math.floor(c / 4);
+  const k = c % 4;
+  const l = (32 + 2 * e + 2 * i - h - k) % 7;
+  const m = Math.floor((a + 11 * h + 22 * l) / 451);
+  const month0 = Math.floor((h + l - 7 * m + 114) / 31) - 1; // 0 = January, so 2 = March
+  const day = ((h + l - 7 * m + 114) % 31) + 1;
+  return new Date(year, month0, day);
+}
+
+// Matariki — gazetted by the government year by year, no formula. Dates
+// below are the official list published by MBIE for 2022-2052 (this file
+// only builds the table out to 2040; extend MATARIKI_DATES and the
+// buildNZHolidays() call below together if you need further years).
+const MATARIKI_DATES: Record<number, [month1: number, day: number]> = {
+  2022: [6, 24], 2023: [7, 14], 2024: [6, 28], 2025: [6, 20], 2026: [7, 10],
+  2027: [6, 25], 2028: [7, 14], 2029: [7, 6],  2030: [6, 21], 2031: [7, 11],
+  2032: [7, 2],  2033: [6, 24], 2034: [7, 7],  2035: [6, 29], 2036: [7, 18],
+  2037: [7, 10], 2038: [6, 25], 2039: [7, 15], 2040: [7, 6],
 };
+
+function dateKey(date: Date): string {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+}
+
+function buildNZHolidays(fromYear: number, toYear: number): Record<string, NZHoliday> {
+  const out: Record<string, NZHoliday> = {};
+  // Only one calendar entry per holiday — at whichever date it's legally
+  // observed on. If that's not the nominal date, the name gets an
+  // "(Observed)" suffix so it's clear on the calendar why it's there.
+  const set = (date: Date, name: string, observed: boolean) => {
+    out[dateKey(date)] = { name: observed ? `${name} (Observed)` : name };
+  };
+
+  for (let year = fromYear; year <= toYear; year++) {
+    const nydActual = new Date(year, 0, 1);
+    const dayAfterActual = new Date(year, 0, 2);
+    const [nyd, dayAfter] = mondayisePair(nydActual, dayAfterActual);
+    set(nyd, "New Year's Day", nyd.getTime() !== nydActual.getTime());
+    set(dayAfter, "Day after New Year's Day", dayAfter.getTime() !== dayAfterActual.getTime());
+
+    const waitangiActual = new Date(year, 1, 6);
+    const waitangi = mondayiseSingle(waitangiActual);
+    set(waitangi, 'Waitangi Day', waitangi.getTime() !== waitangiActual.getTime());
+
+    // Good Friday / Easter Monday (Western) — fixed weekdays, never Mondayised.
+    const easter = computeWesternEaster(year);
+    set(addDays(easter, -2), 'Good Friday (Western)', false);
+    set(addDays(easter, 1), 'Easter Monday (Western)', false);
+
+    const anzacActual = new Date(year, 3, 25);
+    const anzac = mondayiseSingle(anzacActual);
+    set(anzac, 'ANZAC Day', anzac.getTime() !== anzacActual.getTime());
+
+    set(firstMondayOfMonth(year, 5), "King's Birthday", false);
+
+    const matariki = MATARIKI_DATES[year];
+    if (matariki) set(new Date(year, matariki[0] - 1, matariki[1]), 'Matariki', false);
+
+    set(nthMondayOfMonth(year, 9, 4), 'Labour Day', false);
+
+    const xmasActual = new Date(year, 11, 25);
+    const boxingActual = new Date(year, 11, 26);
+    const [xmas, boxing] = mondayisePair(xmasActual, boxingActual);
+    set(xmas, 'Christmas Day', xmas.getTime() !== xmasActual.getTime());
+    set(boxing, 'Boxing Day', boxing.getTime() !== boxingActual.getTime());
+  }
+  return out;
+}
+
+export const NZ_HOLIDAYS: Record<string, NZHoliday> = buildNZHolidays(2022, 2040);
 
 // ── Moveable Feasts (offsets from Pascha — same for all Orthodox) ─────────────
 export const MOVEABLE_OFFSETS: Record<string, FeastData> = {
