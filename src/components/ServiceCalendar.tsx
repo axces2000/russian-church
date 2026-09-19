@@ -555,8 +555,9 @@ export default function ServiceCalendar() {
                   )}
                   {dayData.nzHoliday && (
                     <span style={{ position:'absolute', top:0, right:0, width:0, height:0,
-                      borderStyle:'solid', borderWidth:'0 8px 8px 0',
-                      borderColor:'transparent #2A7A6A transparent transparent' }} />
+                      borderStyle:'solid', borderWidth:'0 15px 15px 0',
+                      borderColor:'transparent #8B0000 transparent transparent',
+                      filter:'drop-shadow(0 1px 1px rgba(0,0,0,0.25))' }} />
                   )}
                   {hasEntries && (
                     <span
