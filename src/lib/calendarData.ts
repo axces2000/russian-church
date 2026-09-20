@@ -138,7 +138,16 @@ export function computeOrthodoxPascha(year: number): Date {
   const f = Math.floor((d + e + 114) / 31);
   const g = ((d + e + 114) % 31) + 1;
   const julianDate = new Date(year, f - 1, g);
-  return new Date(julianDate.getTime() + JULIAN_OFFSET_DAYS * 86400000);
+  // Calendar-field addition, not raw ms (see the matching fix and comment
+  // in getDayData() above) — a fixed 13*24h jump lands an hour off local
+  // midnight whenever the 13-day span crosses NZ's April DST-end
+  // transition. Verified this bites 2026, 2029, 2031 and 2034: the old
+  // ms-based version produced "23:00 the day before" instead of midnight
+  // of the correct day, which reads as the wrong calendar day whenever
+  // this Date's fields are accessed directly (e.g. Holy Saturday's
+  // fastPeriod fell through to null in getFastingPeriods' `date <= fp.end`
+  // check for exactly those years).
+  return new Date(julianDate.getFullYear(), julianDate.getMonth(), julianDate.getDate() + JULIAN_OFFSET_DAYS);
 }
 
 const _paschaCache: Record<number, Date> = {};
@@ -593,8 +602,17 @@ export function getFastLabel(fast: FastType, lang: 'en' | 'ru'): string {
 export function getDayData(date: Date, useJulian = true): DayData {
   const msPerDay = 86400000;
 
+  // Subtract via calendar fields (year/month/date), not raw milliseconds.
+  // `date.getTime() - 13 * msPerDay` looks equivalent but isn't: NZ's DST
+  // transitions mean some real-world days are 23 or 25 hours long, so a
+  // fixed 13*24h subtraction lands an hour off local midnight whenever the
+  // 13-day span crosses a transition — e.g. on 2026-09-27 (NZ's spring-
+  // forward date) it left Sept 27 AND Sept 28 both resolving to the same
+  // "09-14" O.S. key, duplicating the Exaltation of the Cross onto two
+  // consecutive Gregorian days. The Date constructor's own month/day
+  // rollover handles this correctly without ever touching the clock time.
   const lookupDate = useJulian
-    ? new Date(date.getTime() - JULIAN_OFFSET_DAYS * msPerDay)
+    ? new Date(date.getFullYear(), date.getMonth(), date.getDate() - JULIAN_OFFSET_DAYS)
     : date;
 
   const lmm = String(lookupDate.getMonth() + 1).padStart(2, '0');
