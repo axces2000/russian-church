@@ -491,6 +491,15 @@ export default function ServiceCalendar() {
 
     return (
       <div>
+        {/* On narrow (mobile) screens the day number sits centred right next
+            to the fasting icon (pinned top-left) and the two overlap. Nudge
+            the number to the right edge of the cell only below this
+            breakpoint; desktop keeps it centred. */}
+        <style>{`
+          @media (max-width: 640px) {
+            .svc-day-num { align-self: flex-end; }
+          }
+        `}</style>
         <div style={{ background:'var(--color-surface,#fff)',
           border:'1px solid var(--color-accent)', borderRadius:3, overflow:'hidden',
           marginBottom: selectedDate ? 16 : 0 }}>
@@ -532,7 +541,7 @@ export default function ServiceCalendar() {
                   onMouseEnter={e => (e.currentTarget.style.filter = 'brightness(0.95)')}
                   onMouseLeave={e => (e.currentTarget.style.filter = 'none')}
                 >
-                  <span style={{ fontFamily:'var(--font-display)', fontSize:15, lineHeight:1,
+                  <span className="svc-day-num" style={{ fontFamily:'var(--font-display)', fontSize:15, lineHeight:1,
                     fontWeight: cs.bold || isSat ? 700 : 400,
                     color: (isSat && !cs.bold) ? '#8B0000' : cs.text }}>
                     {date.getDate()}
