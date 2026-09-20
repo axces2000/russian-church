@@ -45,7 +45,7 @@ export interface DayData {
   nzHoliday: NZHoliday | null;
   fast: FastType;
   fastPeriod: string | null;
-  tone: number;
+  tone: number | null;
   isHolyWeek: boolean;
   isPascha: boolean;
   isBrightWeek: boolean;
@@ -541,8 +541,19 @@ export function getFastingPeriods(year: number, useJulian: boolean): FastingPeri
 }
 
 // ── Tone of the Week ──────────────────────────────────────────────────────────
-export function getToneForDate(date: Date, pascha: Date): number {
-  const daysDiff  = Math.floor((date.getTime() - pascha.getTime()) / 86400000);
+// The Octoechos cycle runs continuously, Sunday to Sunday, all year round —
+// it never skips a beat when a Great Feast (Pentecost, Nativity on a Sunday,
+// etc.) coincides with a Sunday and displaces that week's resurrectional
+// hymns; the count for the following week simply carries on as if nothing
+// had happened. The one real break in the cycle is Palm Sunday through
+// Bright Saturday (Пасха − 7 … Пасха + 6): Holy Week and Bright Week use
+// their own complete proper hymnody, no Octoechos tone applies at all, and
+// the next cycle always restarts at tone 1 on Antipascha (Thomas Sunday),
+// regardless of what tone the previous cycle's count would have reached had
+// it continued. Returns null for dates in that no-tone window.
+export function getToneForDate(date: Date, pascha: Date): number | null {
+  const daysDiff = Math.floor((date.getTime() - pascha.getTime()) / 86400000);
+  if (daysDiff >= -7 && daysDiff <= 6) return null; // Вербное — Страстная — Светлая седмица
   const weeksDiff = Math.floor(daysDiff / 7);
   const tone = ((weeksDiff % 8) + 8) % 8;
   return tone === 0 ? 8 : tone;

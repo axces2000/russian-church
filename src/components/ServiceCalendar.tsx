@@ -604,6 +604,12 @@ export default function ServiceCalendar() {
                     ].filter(Boolean).join(' · ')}
               </div>
             )}
+            {selectedDayData.tone !== null && (
+              <div style={{ marginTop:4, fontSize:13, fontWeight:600,
+                color:'var(--color-primary)', fontFamily:'var(--font-body)' }}>
+                {lang === 'ru' ? `Глас ${selectedDayData.tone}` : `Tone ${selectedDayData.tone}`}
+              </div>
+            )}
             {selectedDayData.nzHoliday && (
               <div style={{ marginTop:3, fontSize:13, color:'#2A7A6A', fontFamily:'var(--font-body)' }}>
                 🇳🇿 {selectedDayData.nzHoliday.name}
