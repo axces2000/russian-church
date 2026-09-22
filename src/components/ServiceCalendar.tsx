@@ -7,6 +7,7 @@ import { useEffect, useState } from 'react';
 import { useLang } from '../contexts/LangContext';
 import { getDayData, getFeastName, getFastLabel, FAST_DISPLAY } from '../lib/calendarData';
 import type { DayData, FastType } from '../lib/calendarData';
+import { getSundayReading, shortReading } from '../lib/sundayReadings';
 import { subscribeServiceEventsForMonth } from '../lib/firestore';
 import type { ServiceEvent } from '../lib/firestore';
 
@@ -610,6 +611,34 @@ export default function ServiceCalendar() {
                 {lang === 'ru' ? `Глас ${selectedDayData.tone}` : `Tone ${selectedDayData.tone}`}
               </div>
             )}
+            {selectedDayData.isSunday && (() => {
+              const reading = getSundayReading(new Date(selectedDate + 'T00:00:00'), selectedDayData);
+              if (!reading) return null;
+              return (
+                <div style={{ marginTop:10, padding:'10px 14px', background:'var(--color-bg,#f8f5ee)',
+                  borderRadius:3, border:'1px solid var(--color-accent)' }}>
+                  <div style={{ fontSize:11, fontWeight:600, letterSpacing:'0.08em',
+                    textTransform:'uppercase', color:'var(--color-muted)',
+                    marginBottom:6, fontFamily:'var(--font-body)' }}>
+                    {lang === 'ru' ? 'Апостол и Евангелие' : 'Epistle & Gospel'}
+                  </div>
+                  <div style={{ fontFamily:'var(--font-body)', fontSize:14, lineHeight:1.6,
+                    color:'var(--color-text)' }}>
+                    <div><strong>{lang === 'ru' ? 'Ап.' : 'Ep.'}</strong> {shortReading(reading.apostle, lang)}</div>
+                    <div><strong>{lang === 'ru' ? 'Ев.' : 'Gosp.'}</strong> {shortReading(reading.gospel, lang)}</div>
+                    {reading.apostle2 && reading.gospel2 && (
+                      <>
+                        <div style={{ marginTop:6, fontSize:12, fontStyle:'italic', color:'var(--color-muted)' }}>
+                          {lang === 'ru' ? 'Праздника:' : 'Of the feast:'}
+                        </div>
+                        <div><strong>{lang === 'ru' ? 'Ап.' : 'Ep.'}</strong> {shortReading(reading.apostle2, lang)}</div>
+                        <div><strong>{lang === 'ru' ? 'Ев.' : 'Gosp.'}</strong> {shortReading(reading.gospel2, lang)}</div>
+                      </>
+                    )}
+                  </div>
+                </div>
+              );
+            })()}
             {selectedDayData.nzHoliday && (
               <div style={{ marginTop:3, fontSize:13, color:'#2A7A6A', fontFamily:'var(--font-body)' }}>
                 🇳🇿 {selectedDayData.nzHoliday.name}

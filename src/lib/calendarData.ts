@@ -23,6 +23,16 @@ export interface FeastData {
   epistle?: string;
   gospel?: string;
   fastPeriod?: string;
+  /** Used only by sundayReadings.ts to decide what happens to the rank
+   *  (rjadovoe) Sunday Epistle/Gospel when this feast falls on a Sunday.
+   *  'override' — a great Lord's feast: its own reading fully replaces the
+   *  rank reading (the twelve-great-feast Lord's feasts on a fixed date:
+   *  Theophany, Presentation, Annunciation, Transfiguration, Elevation,
+   *  Nativity of Christ — Pascha/Palm Sunday/Ascension/Pentecost are
+   *  handled separately since they are always on a fixed weekday already).
+   *  'combine' — a Theotokos/temple-tier feast: both readings are given,
+   *  rank first, then the feast's own. */
+  sundayRank?: 'override' | 'combine';
 }
 
 export interface NZHoliday {
@@ -324,17 +334,26 @@ export const NZ_HOLIDAYS: Record<string, NZHoliday> = buildNZHolidays(2022, 2040
 
 // ── Moveable Feasts (offsets from Pascha — same for all Orthodox) ─────────────
 export const MOVEABLE_OFFSETS: Record<string, FeastData> = {
-  "-70": { name: "Sunday of the Publican & Pharisee", nameRu: "Неделя о мытаре и фарисее", tier: FEAST_TIERS.DOXOLOGY, fastFree: true },
-  "-63": { name: "Sunday of the Prodigal Son", nameRu: "Неделя о блудном сыне", tier: FEAST_TIERS.DOXOLOGY },
+  "-70": { name: "Sunday of the Publican & Pharisee", nameRu: "Неделя о мытаре и фарисее", tier: FEAST_TIERS.DOXOLOGY, fastFree: true,
+           epistle: "2 Tim 3:10-15", gospel: "Luke 18:10-14" },
+  "-63": { name: "Sunday of the Prodigal Son", nameRu: "Неделя о блудном сыне", tier: FEAST_TIERS.DOXOLOGY,
+           epistle: "1 Cor 6:12-20", gospel: "Luke 15:11-32" },
   "-57": { name: "Saturday of the Departed (Meatfare Saturday)", nameRu: "Мясопустная родительская суббота", tier: FEAST_TIERS.COMMEMORATION },
-  "-56": { name: "Meatfare Sunday (Sunday of the Last Judgment)", nameRu: "Неделя мясопустная (о Страшном Суде)", tier: FEAST_TIERS.DOXOLOGY },
-  "-49": { name: "Cheesefare Sunday (Forgiveness Sunday)", nameRu: "Неделя сыропустная (Прощёное воскресенье)", tier: FEAST_TIERS.DOXOLOGY, fast: FAST_TYPES.DAIRY },
+  "-56": { name: "Meatfare Sunday (Sunday of the Last Judgment)", nameRu: "Неделя мясопустная (о Страшном Суде)", tier: FEAST_TIERS.DOXOLOGY,
+           epistle: "1 Cor 8:8-9:2", gospel: "Matt 25:31-46" },
+  "-49": { name: "Cheesefare Sunday (Forgiveness Sunday)", nameRu: "Неделя сыропустная (Прощёное воскресенье)", tier: FEAST_TIERS.DOXOLOGY, fast: FAST_TYPES.DAIRY,
+           epistle: "Rom 13:11-14:4", gospel: "Matt 6:14-21" },
   "-48": { name: "Clean Monday — Great Lent Begins", nameRu: "Чистый понедельник — начало Великого поста", fastPeriod: FAST_PERIODS.GREAT_LENT },
-  "-42": { name: "Sunday of Orthodoxy (1st Sunday of Lent)", nameRu: "Неделя Торжества Православия (1-я Неделя Великого поста)", tier: FEAST_TIERS.DOXOLOGY },
-  "-35": { name: "Sunday of St Gregory Palamas (2nd Sunday of Lent)", nameRu: "Неделя святителя Григория Паламы (2-я Неделя Великого поста)", tier: FEAST_TIERS.DOXOLOGY },
-  "-28": { name: "Sunday of the Veneration of the Cross (3rd Sunday of Lent)", nameRu: "Неделя Крестопоклонная (3-я Неделя Великого поста)", tier: FEAST_TIERS.DOXOLOGY },
-  "-21": { name: "Sunday of St John Climacus (4th Sunday of Lent)", nameRu: "Неделя преподобного Иоанна Лествичника (4-я Неделя Великого поста)", tier: FEAST_TIERS.DOXOLOGY },
-  "-14": { name: "Sunday of St Mary of Egypt (5th Sunday of Lent)", nameRu: "Неделя преподобной Марии Египетской (5-я Неделя Великого поста)", tier: FEAST_TIERS.DOXOLOGY },
+  "-42": { name: "Sunday of Orthodoxy (1st Sunday of Lent)", nameRu: "Неделя Торжества Православия (1-я Неделя Великого поста)", tier: FEAST_TIERS.DOXOLOGY,
+           epistle: "Heb 11:24-26,32-40", gospel: "John 1:43-51" },
+  "-35": { name: "Sunday of St Gregory Palamas (2nd Sunday of Lent)", nameRu: "Неделя святителя Григория Паламы (2-я Неделя Великого поста)", tier: FEAST_TIERS.DOXOLOGY,
+           epistle: "Heb 1:10-2:3", gospel: "Mark 2:1-12" },
+  "-28": { name: "Sunday of the Veneration of the Cross (3rd Sunday of Lent)", nameRu: "Неделя Крестопоклонная (3-я Неделя Великого поста)", tier: FEAST_TIERS.DOXOLOGY,
+           epistle: "Heb 4:14-5:6", gospel: "Mark 8:34-9:1" },
+  "-21": { name: "Sunday of St John Climacus (4th Sunday of Lent)", nameRu: "Неделя преподобного Иоанна Лествичника (4-я Неделя Великого поста)", tier: FEAST_TIERS.DOXOLOGY,
+           epistle: "Heb 6:13-20", gospel: "Mark 9:17-31" },
+  "-14": { name: "Sunday of St Mary of Egypt (5th Sunday of Lent)", nameRu: "Неделя преподобной Марии Египетской (5-я Неделя Великого поста)", tier: FEAST_TIERS.DOXOLOGY,
+           epistle: "Heb 9:11-14", gospel: "Mark 10:32-45" },
   "-7":  { name: "Palm Sunday — Entry into Jerusalem", nameRu: "Вход Господень в Иерусалим (Вербное воскресенье)", tier: FEAST_TIERS.GREAT, color: "palm",
            epistle: "Phil 4:4-9", gospel: "John 12:1-18", fast: FAST_TYPES.FISH },
   "-6":  { name: "Holy Monday", nameRu: "Великий Понедельник", fast: FAST_TYPES.STRICT, holyWeek: true },
@@ -357,14 +376,29 @@ export const MOVEABLE_OFFSETS: Record<string, FeastData> = {
   "6":   { name: "Bright Saturday", nameRu: "Светлая Суббота",  fastFree: true, color: "bright" },
   "7":   { name: "Thomas Sunday (Antipascha)", nameRu: "Неделя о Фоме (Антипасха)", tier: FEAST_TIERS.GREAT,
            epistle: "Acts 5:12-20", gospel: "John 20:19-31" },
-  "14":  { name: "Sunday of the Myrrh-Bearing Women", nameRu: "Неделя жён-мироносиц", tier: FEAST_TIERS.DOXOLOGY },
-  "21":  { name: "Sunday of the Paralytic", nameRu: "Неделя о расслабленном", tier: FEAST_TIERS.DOXOLOGY },
+  "14":  { name: "Sunday of the Myrrh-Bearing Women", nameRu: "Неделя жён-мироносиц", tier: FEAST_TIERS.DOXOLOGY,
+           epistle: "Acts 6:1-7", gospel: "Mark 15:43-16:8" },
+  "21":  { name: "Sunday of the Paralytic", nameRu: "Неделя о расслабленном", tier: FEAST_TIERS.DOXOLOGY,
+           epistle: "Acts 9:32-42", gospel: "John 5:1-15" },
   "25":  { name: "Mid-Pentecost", nameRu: "Преполовение Пятидесятницы", tier: FEAST_TIERS.VIGIL },
-  "28":  { name: "Sunday of the Samaritan Woman", nameRu: "Неделя о самаряныне", tier: FEAST_TIERS.DOXOLOGY },
-  "35":  { name: "Sunday of the Blind Man", nameRu: "Неделя о слепом", tier: FEAST_TIERS.DOXOLOGY },
+  "28":  { name: "Sunday of the Samaritan Woman", nameRu: "Неделя о самаряныне", tier: FEAST_TIERS.DOXOLOGY,
+           epistle: "Acts 11:19-26,29-30", gospel: "John 4:5-42" },
+  "35":  { name: "Sunday of the Blind Man", nameRu: "Неделя о слепом", tier: FEAST_TIERS.DOXOLOGY,
+           epistle: "Acts 16:16-34", gospel: "John 9:1-38" },
   "39":  { name: "Ascension of the Lord", nameRu: "Вознесение Господне", tier: FEAST_TIERS.GREAT,
            epistle: "Acts 1:1-12", gospel: "Luke 24:36-53" },
-  "42":  { name: "Saturday of the Departed (before Pentecost)", nameRu: "Троицкая родительская суббота", tier: FEAST_TIERS.COMMEMORATION },
+  // NOTE (fix): this key was previously "42": Saturday of the Departed before
+  // Pentecost — but offset 42 (Pascha+42, divisible by 7) always falls on a
+  // SUNDAY, not a Saturday. It is in fact the 7th Sunday of Pascha, the
+  // Sunday of the Holy Fathers of the First Ecumenical Council (the one
+  // Sunday between Ascension and Pentecost). Troitskaya roditel'skaya
+  // subbota is the Saturday immediately before Pentecost, i.e. offset 48 —
+  // moved there below. Verified against multiple liturgical calendar
+  // sources; flagging clearly since this also changes the feast name/colour
+  // previously shown on this day.
+  "42":  { name: "Sunday of the Holy Fathers of the First Ecumenical Council", nameRu: "Неделя святых отцов Первого Вселенского Собора",
+           tier: FEAST_TIERS.DOXOLOGY, epistle: "Acts 20:16-18,28-36", gospel: "John 17:1-13" },
+  "48":  { name: "Saturday of the Departed (before Pentecost)", nameRu: "Троицкая родительская суббота", tier: FEAST_TIERS.COMMEMORATION },
   "49":  { name: "Pentecost — Holy Trinity Sunday", nameRu: "День Святой Троицы. Пятидесятница", tier: FEAST_TIERS.GREAT,
            epistle: "Acts 2:1-11", gospel: "John 7:37-52", fastFree: true, color: "pentecost" },
   "50":  { name: "Monday of the Holy Spirit", nameRu: "День Святого Духа", fastFree: true },
@@ -381,7 +415,7 @@ export const FIXED_FEASTS: Record<string, FeastData> = {
              epistle: "Col 2:8-12", gospel: "Luke 2:20-21,40-52" },
   "01-05": { name: "Eve of Holy Theophany — Royal Hours", nameRu: "Навечерие Богоявления (Крещенский сочельник)", fast: FAST_TYPES.STRICT },
   "01-06": { name: "Holy Theophany — Baptism of the Lord", nameRu: "Святое Богоявление. Крещение Господне", tier: FEAST_TIERS.GREAT,
-             saint: "St John the Forerunner & Baptist",
+             saint: "St John the Forerunner & Baptist", sundayRank: 'override',
              epistle: "Titus 2:11-14; 3:4-7", gospel: "Matt 3:13-17" },
   "01-07": { name: "Synaxis of St John the Forerunner & Baptist", nameRu: "Собор Иоанна Предтечи", tier: FEAST_TIERS.POLYELEOS,
              saint: "St John the Forerunner & Baptist of Christ",
@@ -394,14 +428,14 @@ export const FIXED_FEASTS: Record<string, FeastData> = {
              saint: "Ss Basil the Great, Gregory the Theologian & John Chrysostom",
              epistle: "Heb 13:7-16", gospel: "Matt 5:14-19" },
   "02-02": { name: "Presentation of the Lord in the Temple", nameRu: "Сретение Господне", tier: FEAST_TIERS.GREAT,
-             saint: "Simeon the God-receiver & Anna the Prophetess",
+             saint: "Simeon the God-receiver & Anna the Prophetess", sundayRank: 'override',
              epistle: "Heb 7:7-17", gospel: "Luke 2:22-40" },
   "02-10": { name: "St Charalambos the Hieromartyr", nameRu: "Священномученика Харалампия", tier: FEAST_TIERS.POLYELEOS,
              saint: "St Charalambos, Hieromartyr" },
   "03-09": { name: "Forty Holy Martyrs of Sebaste", nameRu: "Сорока мучеников Севастийских", tier: FEAST_TIERS.POLYELEOS,
              saint: "The Forty Holy Martyrs of Sebaste in Armenia" },
   "03-25": { name: "Annunciation of the Most Holy Theotokos", nameRu: "Благовещение Пресвятой Богородицы", tier: FEAST_TIERS.GREAT,
-             saint: "The Most Holy Theotokos",
+             saint: "The Most Holy Theotokos", sundayRank: 'override',
              epistle: "Heb 2:11-18", gospel: "Luke 1:24-38", fast: FAST_TYPES.FISH },
   "04-23": { name: "St George the Great Martyr & Trophy-Bearer", nameRu: "Великомученика Георгия Победоносца", tier: FEAST_TIERS.POLYELEOS,
              saint: "St George the Trophy-Bearer, Great Martyr",
@@ -436,10 +470,10 @@ export const FIXED_FEASTS: Record<string, FeastData> = {
              saint: "Holy Maccabean Martyrs; beginning of Dormition Fast",
              fast: FAST_TYPES.STRICT },
   "08-06": { name: "Transfiguration of Our Lord Jesus Christ", nameRu: "Преображение Господне", tier: FEAST_TIERS.GREAT,
-             saint: "Our Lord Jesus Christ on Mount Tabor",
+             saint: "Our Lord Jesus Christ on Mount Tabor", sundayRank: 'override',
              epistle: "2 Pet 1:10-19", gospel: "Matt 17:1-9", fast: FAST_TYPES.FISH },
   "08-15": { name: "Dormition of the Most Holy Theotokos", nameRu: "Успение Пресвятой Богородицы", tier: FEAST_TIERS.GREAT,
-             saint: "The Most Holy Theotokos & Ever-Virgin Mary",
+             saint: "The Most Holy Theotokos & Ever-Virgin Mary", sundayRank: 'combine',
              epistle: "Phil 4:4-9", gospel: "Luke 10:38-42; 11:27-28" },
   "08-16": { name: "Translation of the Holy Mandylion (Image Not Made by Hands)", nameRu: "Перенесение Нерукотворного Образа Господа Иисуса Христа",
              tier: FEAST_TIERS.VIGIL, saint: "The Holy Mandylion" },
@@ -451,17 +485,17 @@ export const FIXED_FEASTS: Record<string, FeastData> = {
   "09-01": { name: "Beginning of the Indiction — Church New Year", nameRu: "Начало индикта — церковное новолетие", tier: FEAST_TIERS.DOXOLOGY,
              saint: "St Symeon Stylites the Elder" },
   "09-08": { name: "Nativity of the Most Holy Theotokos", nameRu: "Рождество Пресвятой Богородицы", tier: FEAST_TIERS.GREAT,
-             saint: "The Most Holy Theotokos & Ever-Virgin Mary",
+             saint: "The Most Holy Theotokos & Ever-Virgin Mary", sundayRank: 'combine',
              epistle: "Phil 4:4-9", gospel: "Luke 10:38-42; 11:27-28" },
   "09-14": { name: "Universal Exaltation of the Precious & Life-Giving Cross", nameRu: "Воздвижение Честного и Животворящего Креста Господня",
-             tier: FEAST_TIERS.GREAT,
+             tier: FEAST_TIERS.GREAT, sundayRank: 'override',
              saint: "The Life-Giving Cross of the Lord",
              epistle: "1 Cor 1:18-24", gospel: "John 19:6-11,13-20,25-28,30-35",
              fast: FAST_TYPES.STRICT },
   "09-26": { name: "Repose of St John the Theologian", nameRu: "Преставление апостола Иоанна Богослова", tier: FEAST_TIERS.DOXOLOGY,
              saint: "St John the Theologian, Apostle & Evangelist" },
   "10-01": { name: "Protection of the Most Holy Theotokos (Pokrov)", nameRu: "Покров Пресвятой Богородицы", tier: FEAST_TIERS.VIGIL,
-             saint: "The Most Holy Theotokos",
+             saint: "The Most Holy Theotokos", sundayRank: 'combine',
              epistle: "Heb 9:1-7", gospel: "Luke 10:38-42; 11:27-28" },
   "10-18": { name: "St Luke the Apostle & Evangelist", nameRu: "Апостола и евангелиста Луки", tier: FEAST_TIERS.DOXOLOGY,
              saint: "St Luke the Holy Apostle & Evangelist" },
@@ -476,7 +510,7 @@ export const FIXED_FEASTS: Record<string, FeastData> = {
   "11-14": { name: "Holy Apostle Philip; Nativity Fast begins", nameRu: "Апостола Филиппа; начало Рождественского поста",
              tier: FEAST_TIERS.DOXOLOGY, saint: "Holy Apostle Philip" },
   "11-21": { name: "Entry of the Theotokos into the Temple", nameRu: "Введение во храм Пресвятой Богородицы", tier: FEAST_TIERS.GREAT,
-             saint: "The Most Holy Theotokos",
+             saint: "The Most Holy Theotokos", sundayRank: 'combine',
              epistle: "Heb 9:1-7", gospel: "Luke 10:38-42; 11:27-28" },
   "11-25": { name: "St Catherine the Great Martyr", nameRu: "Великомученицы Екатерины", tier: FEAST_TIERS.POLYELEOS,
              saint: "St Catherine of Alexandria, Great Martyr & Bride of Christ" },
@@ -495,10 +529,10 @@ export const FIXED_FEASTS: Record<string, FeastData> = {
   "12-24": { name: "Forefeast of the Nativity of Christ — Christmas Eve", nameRu: "Навечерие Рождества Христова (Рождественский сочельник)",
              tier: FEAST_TIERS.VIGIL, fast: FAST_TYPES.STRICT },
   "12-25": { name: "Nativity of Our Lord Jesus Christ", nameRu: "Рождество Христово", tier: FEAST_TIERS.GREAT,
-             saint: "The Lord Jesus Christ, born in the flesh of the Virgin Mary",
+             saint: "The Lord Jesus Christ, born in the flesh of the Virgin Mary", sundayRank: 'override',
              epistle: "Gal 4:4-7", gospel: "Matt 2:1-12", fastFree: true, color: "nativity" },
   "12-26": { name: "Synaxis of the Most Holy Theotokos", nameRu: "Собор Пресвятой Богородицы", tier: FEAST_TIERS.GREAT,
-             saint: "The Most Holy Theotokos", fastFree: true },
+             saint: "The Most Holy Theotokos", fastFree: true, sundayRank: 'combine' },
   "12-27": { name: "Holy Protomartyr & Archdeacon Stephen", nameRu: "Первомученика архидиакона Стефана", tier: FEAST_TIERS.POLYELEOS,
              saint: "St Stephen the First Martyr & Archdeacon", fastFree: true },
 };
