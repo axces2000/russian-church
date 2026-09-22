@@ -73,7 +73,7 @@ function getCellStyle(d: DayData) {
   if (color === 'pentecost') return { bg:'#EEF5E8', border:'#5A8A48', text:'#2A5818', bold:true  };
   if (color === 'nativity')  return { bg:'#EAF0FA', border:'#5A78B8', text:'#1E3870', bold:true  };
   if (tier  === 'great')     return { bg:'#FDE8E8', border:'#C07070', text:'#7A1010', bold:true  };
-  if (d.isSunday)            return { bg:'var(--color-surface,#fff)', border:'var(--color-accent)', text:'var(--color-primary)', bold:true };
+  if (d.isSunday)            return { bg:'var(--color-surface,#fff)', border:'var(--color-accent)', text:'#8B0000', bold:true };
   return { bg:'var(--color-surface,#fff)', border:'var(--color-accent,#c9a227)', text:'var(--color-text,#2b2418)', bold:false };
 }
 
