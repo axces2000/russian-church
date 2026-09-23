@@ -605,6 +605,27 @@ export default function ServiceCalendar() {
                     ].filter(Boolean).join(' · ')}
               </div>
             )}
+            {/* An actual posted service takes priority — shown before the
+                tone/reading info rather than buried below it. Plain text,
+                no boxed card — that framing belongs to the reading only. */}
+            {selectedEvent && (
+              <div style={{ marginTop:10, paddingBottom:14, marginBottom:12,
+                borderBottom:'1px solid var(--color-accent)' }}>
+                <div style={{ fontSize:11, fontWeight:600, letterSpacing:'0.1em',
+                  textTransform:'uppercase', color:'var(--color-muted)',
+                  marginBottom:6, fontFamily:'var(--font-body)' }}>
+                  {lang === 'ru' ? 'Расписание богослужений' : 'Service Schedule'}
+                </div>
+                <div style={{ fontFamily:'var(--font-body)', fontSize:16,
+                  lineHeight:1.8, color:'var(--color-text)' }}>
+                  {renderEntryText(
+                    lang === 'ru'
+                      ? (selectedEvent.entriesRu || selectedEvent.entriesEn)
+                      : (selectedEvent.entriesEn || selectedEvent.entriesRu)
+                  )}
+                </div>
+              </div>
+            )}
             {selectedDayData.tone !== null && (
               <div style={{ marginTop:4, fontSize:13, fontWeight:600,
                 color:'var(--color-primary)', fontFamily:'var(--font-body)' }}>
@@ -660,32 +681,16 @@ export default function ServiceCalendar() {
                 {lang === 'ru' ? 'По старому стилю: ' : 'Old Style: '}{selectedDayData.julianDateStr}
               </div>
             )}
-            <div style={{ borderTop:'1px solid var(--color-accent)', paddingTop:14, marginTop:12 }}>
-              {selectedEvent ? (
-                <>
-                  <div style={{ fontSize:11, fontWeight:600, letterSpacing:'0.1em',
-                    textTransform:'uppercase', color:'var(--color-muted)',
-                    marginBottom:10, fontFamily:'var(--font-body)' }}>
-                    {lang === 'ru' ? 'Расписание богослужений' : 'Service Schedule'}
-                  </div>
-                  <div style={{ fontFamily:'var(--font-body)', fontSize:16,
-                    lineHeight:1.8, color:'var(--color-text)' }}>
-                    {renderEntryText(
-                      lang === 'ru'
-                        ? (selectedEvent.entriesRu || selectedEvent.entriesEn)
-                        : (selectedEvent.entriesEn || selectedEvent.entriesRu)
-                    )}
-                  </div>
-                </>
-              ) : (
+            {!selectedEvent && (
+              <div style={{ borderTop:'1px solid var(--color-accent)', paddingTop:14, marginTop:12 }}>
                 <p style={{ margin:0, fontSize:14, color:'var(--color-muted)',
                   fontStyle:'italic', fontFamily:'var(--font-body)' }}>
                   {lang === 'ru'
                     ? 'Расписание богослужений пока не добавлено.'
                     : 'No service schedule posted for this day yet.'}
                 </p>
-              )}
-            </div>
+              </div>
+            )}
           </div>
         )}
 
