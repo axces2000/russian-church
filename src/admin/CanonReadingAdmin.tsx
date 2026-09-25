@@ -2,8 +2,9 @@
 // Admin page for the weekly online Canon Reading announcement.
 //
 // The AI (Gemini) is used for two separate things: locating candidate URLs
-// (one set for the canon's own text, another for an English Wikipedia
-// article about that week's saint/feast), and — once the Russian
+// (one set for the canon's own text, another for an English-language page —
+// preferring oca.org, falling back to Wikipedia — about that week's
+// saint/feast), and — once the Russian
 // announcement is generated — translating it into English for the site's
 // English-language visitors. The announcement wording itself and its
 // date/day formatting are deterministic templating
@@ -549,17 +550,17 @@ export default function CanonReadingAdmin() {
                   </div>
                 </div>
 
-                {/* ── English Wikipedia link ── */}
+                {/* ── English reference link (oca.org, falling back to Wikipedia) ── */}
                 <div style={{ padding:'14px 16px', background:'#f4f6fa', borderRadius:4,
                   border:'1px solid #dde3ec', marginBottom:18 }}>
                   <div style={{ fontSize:12, fontWeight:600, color:'#444', marginBottom:6 }}>
-                    English Wikipedia link{wikiSearching && <span style={{ color:'#888', fontWeight:400 }}> — searching…</span>}
+                    English reference link (oca.org, or Wikipedia as fallback){wikiSearching && <span style={{ color:'#888', fontWeight:400 }}> — searching…</span>}
                   </div>
 
                   {wikiResult && !wikiResult.found && (
                     <p style={{ color:'#888', fontSize:12, margin:'0 0 8px', fontStyle:'italic' }}>
-                      No specific saint/feast article found (or this is a general canon) — the
-                      default link below will be used unless you type one in manually.
+                      No specific saint/feast page found on oca.org or Wikipedia (or this is a
+                      general canon) — the default link below will be used unless you type one in manually.
                     </p>
                   )}
 
@@ -613,7 +614,7 @@ export default function CanonReadingAdmin() {
                         style={s.input} placeholder="Article subject, e.g. Saint Nicholas" />
                       <input value={draft.wikipediaLink}
                         onChange={e => setDraft(d => ({ ...d, wikipediaLink: e.target.value }))}
-                        style={s.input} placeholder="https://en.wikipedia.org/wiki/…" />
+                        style={s.input} placeholder="https://oca.org/… or https://en.wikipedia.org/wiki/…" />
                     </div>
                   )}
                 </div>

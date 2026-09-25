@@ -2,8 +2,12 @@
 //
 // Two authenticated callable Cloud Functions:
 //   findCanonLink(query)       — candidate pages with the canon's actual text
-//   findWikiLink(dedication)   — candidate English Wikipedia article about
-//                                 the saint/feast/icon named in the dedication
+//   findWikiLink(dedication)   — candidate English-language reference page
+//                                 about the saint/feast/icon named in the
+//                                 dedication; prefers oca.org (Orthodox
+//                                 Church in America), falling back to an
+//                                 English Wikipedia article when oca.org
+//                                 has nothing relevant
 //
 // These used to be one combined function, but running both grounded
 // searches (each with a possible retry) inside a single invocation could
@@ -178,6 +182,55 @@ function buildOtherCanonSourcesPrompt(query, { emphasizeSearch } = {}) {
     'them here):',
     'TITLE: <short Russian title of the canon>',
     'URL: <the direct URL to the page with the canon text>'
+  );
+  return lines.join('\n');
+}
+
+// Searches oca.org (Orthodox Church in America) for an English-language
+// page about the saint/feast/icon/event named in the dedication. Preferred
+// over Wikipedia (see findWikiLink below) since it's a dedicated Orthodox
+// source with its own Lives of the Saints and Feasts and Saints sections,
+// a more natural English companion to a Church Slavonic/Russian canon than
+// a general encyclopedia article.
+function buildOcaPrompt(dedication, { emphasizeSearch } = {}) {
+  const lines = [
+    'You are finding the OCA.org (Orthodox Church in America) page about the',
+    'specific saint, feast, icon, or event named in this Orthodox Christian',
+    `canon dedication (given in Russian, dative case): "${dedication}"`,
+    '',
+    'You MUST use the Google Search tool for this — never answer from memory',
+    'alone.',
+    '',
+    'First identify the English name of the saint, feast, icon, or event —',
+    'for example "воздвижению Креста" -> "Exaltation of the Cross",',
+    '"святителю Николаю Чудотворцу" -> "Saint Nicholas the Wonderworker".',
+    '',
+    'If this dedication is a general canon to the Lord, the Theotokos, or the',
+    'Holy Trinity (i.e. not a specific named saint, icon, or feast), respond',
+    'with exactly: GENERAL',
+    '',
+    'Otherwise search oca.org for a page about that subject, for example:',
+    '  oca.org Exaltation of the Cross',
+    "(a plain query naming the domain like that reliably surfaces oca.org's",
+    "own Lives of the Saints / Feasts and Saints pages; site:oca.org works",
+    'too if you prefer it).',
+  ];
+  if (emphasizeSearch) {
+    lines.push(
+      '',
+      'This is a retry: your previous answer did not come with a real search',
+      'citation, meaning you likely answered from memory rather than actually',
+      'calling the tool. Call it for real this time.'
+    );
+  }
+  lines.push(
+    '',
+    'If oca.org does not have a good matching page, respond with exactly the',
+    'single word: NOT_FOUND',
+    '',
+    'Otherwise respond in exactly this format and nothing else:',
+    'TITLE: <English name of the subject>',
+    'URL: <the direct oca.org URL to the page>'
   );
   return lines.join('\n');
 }
@@ -593,10 +646,33 @@ exports.findWikiLink = onCall(
     if (!dedication) {
       throw new HttpsError('invalid-argument', 'Please provide a canon dedication.');
     }
-    return runGroundedSearch(geminiApiKey.value(), (opts) => buildWikiPrompt(dedication, opts), {
-      domainFilter: WIKI_DOMAIN_HINT,
-      limit: 2,
-    });
+
+    // oca.org is preferred — search it and Wikipedia in PARALLEL (via
+    // Promise.allSettled, same reasoning as the three canon-text sources
+    // above) rather than only searching Wikipedia after oca.org comes back
+    // empty, so the fallback costs no extra wall-clock time.
+    const settled = await Promise.allSettled([
+      runGroundedSearch(geminiApiKey.value(), (opts) => buildOcaPrompt(dedication, opts), {
+        limit: 2,
+      }),
+      runGroundedSearch(geminiApiKey.value(), (opts) => buildWikiPrompt(dedication, opts), {
+        domainFilter: WIKI_DOMAIN_HINT,
+        limit: 2,
+      }),
+    ]);
+    const toResult = (outcome, label) => {
+      if (outcome.status === 'fulfilled') return outcome.value;
+      console.error(`${label} search failed:`, outcome.reason && outcome.reason.message);
+      return { found: false };
+    };
+    const ocaResult = toResult(settled[0], 'oca');
+    const wikiResult = toResult(settled[1], 'wikipedia');
+
+    if (ocaResult.found) return ocaResult;
+    if (wikiResult.found) return wikiResult;
+
+    const rawText = [ocaResult.rawText, wikiResult.rawText].filter(Boolean).join(' / ');
+    return { found: false, rawText: rawText || undefined };
   }
 );
 
