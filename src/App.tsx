@@ -1,5 +1,6 @@
 // src/App.tsx
 
+import { lazy, Suspense } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 
 import { LangProvider }        from './contexts/LangContext';
@@ -10,16 +11,29 @@ import AuthGuard               from './components/AuthGuard';
 import AnalyticsTracker        from './components/AnalyticsTracker';
 import SiteLayout              from './components/SiteLayout';
 import SectionPage             from './pages/SectionPage';
-import LoginPage               from './admin/LoginPage';
-import AdminDashboard          from './admin/AdminDashboard';
-import ContentAdmin            from './admin/ContentAdmin';
-import PageEditor              from './admin/PageEditor';
-import TemplateSwitcher        from './admin/TemplateSwitcher';
-import SiteSettings            from './admin/SiteSettings';
-import AdminUsers              from './admin/AdminUsers';
-import CalendarAdmin           from './admin/CalendarAdmin';
-import SundaySchoolAdmin       from './admin/SundaySchoolAdmin';
-import CanonReadingAdmin       from './admin/CanonReadingAdmin';
+
+// Admin pages are lazy-loaded: a public visitor reading the Service
+// Schedule should never have to download the entire admin panel (the rich
+// text editor wrapper, six separate admin screens, etc.) just to see the
+// homepage. Only a route under /admin pulls this chunk in.
+const LoginPage         = lazy(() => import('./admin/LoginPage'));
+const AdminDashboard    = lazy(() => import('./admin/AdminDashboard'));
+const ContentAdmin      = lazy(() => import('./admin/ContentAdmin'));
+const PageEditor        = lazy(() => import('./admin/PageEditor'));
+const TemplateSwitcher  = lazy(() => import('./admin/TemplateSwitcher'));
+const SiteSettings      = lazy(() => import('./admin/SiteSettings'));
+const AdminUsers        = lazy(() => import('./admin/AdminUsers'));
+const CalendarAdmin     = lazy(() => import('./admin/CalendarAdmin'));
+const SundaySchoolAdmin = lazy(() => import('./admin/SundaySchoolAdmin'));
+const CanonReadingAdmin = lazy(() => import('./admin/CanonReadingAdmin'));
+
+// Shared fallback shown for the brief moment an admin chunk is downloading —
+// same plain style AuthGuard already uses for its own loading state.
+const adminLoadingFallback = (
+  <div style={{ padding: 40, textAlign: 'center', fontFamily: 'sans-serif' }}>
+    Loading…
+  </div>
+);
 
 export default function App() {
   return (
@@ -28,6 +42,7 @@ export default function App() {
         <ThemeProvider>
           <BrowserRouter>
             <AnalyticsTracker />
+            <Suspense fallback={adminLoadingFallback}>
             <Routes>
 
               {/* ── Public site ── */}
@@ -74,6 +89,7 @@ export default function App() {
 
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
+            </Suspense>
           </BrowserRouter>
         </ThemeProvider>
       </AuthProvider>
