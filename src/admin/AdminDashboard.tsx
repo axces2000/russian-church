@@ -3,7 +3,7 @@
 //import React from 'react';
 import { Link } from 'react-router-dom';
 import { signOut } from 'firebase/auth';
-import { auth } from '../lib/firebase';
+import { auth } from '../lib/firebaseAdmin';
 import { useAuth } from '../contexts/AuthContext';
 
 export default function AdminDashboard() {

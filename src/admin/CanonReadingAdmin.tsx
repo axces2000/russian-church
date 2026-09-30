@@ -16,7 +16,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { httpsCallable } from 'firebase/functions';
-import { functions } from '../lib/firebase';
+import { functions } from '../lib/firebaseAdmin';
 import {
   getCanonSettings,
   updateCanonSettings,

@@ -14,7 +14,7 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { initializeApp, deleteApp } from 'firebase/app';
 import { getAuth, createUserWithEmailAndPassword } from 'firebase/auth';
-import { auth as mainAuth } from '../lib/firebase';
+import { auth as mainAuth } from '../lib/firebaseAdmin';
 import { getAdmins, saveAdmin, deleteAdmin, getSections } from '../lib/firestore';
 import type { AdminRecord, Section } from '../lib/firestore';
 

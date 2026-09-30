@@ -4,7 +4,8 @@ import React, { createContext, useContext, useEffect, useState } from 'react';
 import { onAuthStateChanged } from 'firebase/auth';
 import type { User } from 'firebase/auth';
 import { doc, getDoc } from 'firebase/firestore';
-import { auth, db } from '../lib/firebase';
+import { db } from '../lib/firebase';
+import { auth } from '../lib/firebaseAdmin';
 
 export type Role = 'superadmin' | 'admin' | null;
 

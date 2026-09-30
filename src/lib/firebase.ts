@@ -1,10 +1,13 @@
 // src/lib/firebase.ts
+// Public-safe Firebase surface: the App instance, Firestore, and Analytics.
+// The public site needs all three, so it's fine for them to load eagerly.
+// Auth, Storage, and Cloud Functions are admin-only concerns and live in
+// ./firebaseAdmin.ts instead — keeping them out of this file is what stops
+// those SDKs from ever reaching a public visitor's bundle. See
+// src/admin/AdminApp.tsx for why the split matters.
 
 import { initializeApp } from 'firebase/app';
 import { getFirestore } from 'firebase/firestore';
-import { getAuth } from 'firebase/auth';
-import { getStorage } from 'firebase/storage';
-import { getFunctions, connectFunctionsEmulator } from 'firebase/functions';
 import type { Analytics } from 'firebase/analytics';
 
 const firebaseConfig = {
@@ -17,22 +20,11 @@ const firebaseConfig = {
   measurementId:     import.meta.env.VITE_FIREBASE_MEASUREMENT_ID,
 };
 
-const app = initializeApp(firebaseConfig);
+// Exported so firebaseAdmin.ts can attach Auth/Storage/Functions to the
+// same App instance without this file needing to know about any of them.
+export const app = initializeApp(firebaseConfig);
 
-export const db      = getFirestore(app);
-export const auth    = getAuth(app);
-export const storage = getStorage(app);
-
-// Cloud Functions — region must match firestore/hosting region.
-// Set VITE_USE_FUNCTIONS_EMULATOR=true in .env.local to point this at a
-// locally-running `firebase emulators:start --only functions` instance
-// instead of the deployed (production) functions. Everything else (auth,
-// firestore, storage) keeps hitting the live project as usual, matching
-// how `npm run dev` already works for the rest of the app.
-export const functions = getFunctions(app, 'australia-southeast1');
-if (import.meta.env.VITE_USE_FUNCTIONS_EMULATOR === 'true') {
-  connectFunctionsEmulator(functions, '127.0.0.1', 5001);
-}
+export const db = getFirestore(app);
 
 // Analytics is optional: the site works fine without VITE_FIREBASE_MEASUREMENT_ID
 // set (e.g. in local dev). isSupported() also guards against browser

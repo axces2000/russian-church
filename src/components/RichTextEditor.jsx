@@ -4,7 +4,7 @@
 
 import React, { useEffect, useRef, useState } from 'react';
 import { ref as storageRef, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
-import { storage } from '../lib/firebase';
+import { storage } from '../lib/firebaseAdmin';
 
 const COLOURS = [
   { label: 'Default', value: null },
