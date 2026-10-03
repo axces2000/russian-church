@@ -132,6 +132,12 @@ function toMoscow(nzDate: Date, timeNZ: string): ZonedDateTime {
   return readInZone(utcInstant, MOSCOW_TIMEZONE);
 }
 
+// A bare domain such as "oca.org" is never a valid article subject — it
+// means a search-citation title leaked through instead of a real name.
+function looksLikeBareDomain(s: string): boolean {
+  return /^[a-z0-9-]+(\.[a-z0-9-]+)+$/i.test(s.trim());
+}
+
 export function buildCanonReadingHtml(f: CanonReadingFields, audience: CanonAudience = 'nz'): string {
   let dayPhrase: string;
   let dateStr: string;
@@ -167,8 +173,10 @@ export function buildCanonReadingHtml(f: CanonReadingFields, audience: CanonAudi
 
   // With a specific article (e.g. "Saint Nicholas"), name it directly rather
   // than using the generic "structure of the Orthodox Church Canons" phrase,
-  // which only fits the general default link.
-  const wikiTitle = f.wikipediaTitle.trim();
+  // which only fits the general default link. A domain-looking value (e.g.
+  // "oca.org") is treated as empty — see looksLikeBareDomain above.
+  const rawWikiTitle = f.wikipediaTitle.trim();
+  const wikiTitle = looksLikeBareDomain(rawWikiTitle) ? '' : rawWikiTitle;
   const wikiLine = wikiTitle
     ? `The story of ${wikiTitle} (in English):`
     : 'The story and the structure of the Orthodox Church Canons (in English):';

@@ -1,10 +1,11 @@
 // src/admin/CanonReadingAdmin.tsx
 // Admin page for the weekly online Canon Reading announcement.
 //
-// The AI (Gemini) is used for two separate things: locating candidate URLs
+// The AI (Gemini) is used for three separate things: locating candidate URLs
 // (one set for the canon's own text, another for an English-language page —
 // preferring oca.org, falling back to Wikipedia — about that week's
-// saint/feast), and — once the Russian
+// saint/feast), translating the Russian dedication into the English subject
+// name shown in "The story of … (in English):", and — once the Russian
 // announcement is generated — translating it into English for the site's
 // English-language visitors. The announcement wording itself and its
 // date/day formatting are deterministic templating
@@ -150,6 +151,12 @@ export default function CanonReadingAdmin() {
   const [wikiManual, setWikiManual] = useState(false);
   const [wikiUseDefault, setWikiUseDefault] = useState(true);
 
+  // English name of the saint/feast, translated from the Russian dedication
+  // (e.g. "воздвижению Креста Господня" -> "Exaltation of the Cross"). Used
+  // as the subject in "The story of … (in English):". Empty for general
+  // canons or if the translation call failed.
+  const [dedicationEn, setDedicationEn] = useState('');
+
   // English translation of the generated announcement
   const [translating, setTranslating] = useState(false);
   const [translateError, setTranslateError] = useState('');
@@ -164,6 +171,7 @@ export default function CanonReadingAdmin() {
     setCanonResult(null); setCanonSelectedIdx(null); setCanonConfirmed(false); setCanonManual(false);
     setWikiResult(null); setWikiSelectedIdx(null); setWikiConfirmed(false); setWikiManual(false);
     setWikiUseDefault(true);
+    setDedicationEn('');
     setSearchError('');
     setTranslateError('');
     setMoscowText('');
@@ -238,6 +246,16 @@ export default function CanonReadingAdmin() {
       // active choice, never applied silently.
       .catch((err: any) => setSearchError(prev => prev || (err.message || 'Wikipedia search failed.')))
       .finally(() => setWikiSearching(false));
+
+    // Translate the Russian dedication into the English subject name, in
+    // parallel with the searches. Non-fatal: if it fails, the English line
+    // simply falls back to the title returned by the link search.
+    const dedFn = httpsCallable<{ dedication: string }, { title: string }>(
+      functions, 'translateDedication', { timeout: 60000 }
+    );
+    dedFn({ dedication })
+      .then(r => setDedicationEn(r.data.title || ''))
+      .catch(() => { /* non-fatal */ });
   }
 
   function selectCanonCandidate(i: number, c: FindCandidate) {
@@ -258,12 +276,14 @@ export default function CanonReadingAdmin() {
     setWikiManual(false);
     setWikiSelectedIdx(i);
     setWikiConfirmed(false);
-    setDraft(d => ({ ...d, wikipediaLink: c.url, wikipediaTitle: c.title }));
+    // The translated dedication wins over the search result's title.
+    setDraft(d => ({ ...d, wikipediaLink: c.url, wikipediaTitle: dedicationEn || c.title }));
   }
   function selectWikiManual() {
     setWikiUseDefault(false);
     setWikiManual(true);
     setWikiSelectedIdx(null);
+    setDraft(d => ({ ...d, wikipediaTitle: d.wikipediaTitle || dedicationEn }));
   }
 
   function handleGenerate() {
@@ -556,6 +576,12 @@ export default function CanonReadingAdmin() {
                   <div style={{ fontSize:12, fontWeight:600, color:'#444', marginBottom:6 }}>
                     English reference link (oca.org, or Wikipedia as fallback){wikiSearching && <span style={{ color:'#888', fontWeight:400 }}> — searching…</span>}
                   </div>
+
+                  {dedicationEn && (
+                    <p style={{ margin:'0 0 8px', fontSize:12.5, color:'#2c1a3e' }}>
+                      English subject (translated from the dedication): <strong>{dedicationEn}</strong>
+                    </p>
+                  )}
 
                   {wikiResult && !wikiResult.found && (
                     <p style={{ color:'#888', fontSize:12, margin:'0 0 8px', fontStyle:'italic' }}>

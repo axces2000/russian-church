@@ -1,13 +1,18 @@
 // functions/index.js
 //
-// Two authenticated callable Cloud Functions:
-//   findCanonLink(query)       — candidate pages with the canon's actual text
-//   findWikiLink(dedication)   — candidate English-language reference page
-//                                 about the saint/feast/icon named in the
-//                                 dedication; prefers oca.org (Orthodox
-//                                 Church in America), falling back to an
-//                                 English Wikipedia article when oca.org
-//                                 has nothing relevant
+// Authenticated callable Cloud Functions:
+//   findCanonLink(query)           — candidate pages with the canon's actual text
+//   findWikiLink(dedication)       — candidate English-language reference page
+//                                     about the saint/feast/icon named in the
+//                                     dedication; prefers oca.org (Orthodox
+//                                     Church in America), falling back to an
+//                                     English Wikipedia article when oca.org
+//                                     has nothing relevant
+//   translateDedication(dedication)— Russian dative-case dedication -> English
+//                                     nominative name (e.g. "воздвижению Креста
+//                                     Господня" -> "Exaltation of the Cross"),
+//                                     used as the subject in the English line
+//   translateCanonReading(html)    — Russian announcement HTML -> English
 //
 // These used to be one combined function, but running both grounded
 // searches (each with a possible retry) inside a single invocation could
@@ -260,6 +265,27 @@ function buildWikiPrompt(dedication, { emphasizeSearch } = {}) {
   ].join('\n');
 }
 
+// Converts the Russian dative-case dedication into the English name of the
+// saint/feast/icon (nominative), used as the subject in the English line
+// "The story of <name> (in English):". Pure language task — no search.
+function buildDedicationTranslationPrompt(dedication) {
+  return [
+    'Convert this Russian Orthodox canon dedication (dative case) into the',
+    'English name of the saint, feast, or icon, in the nominative case, as it',
+    'would be titled on oca.org.',
+    `Dedication: "${dedication}"`,
+    '',
+    'Examples:',
+    '"святителю Николаю Чудотворцу" -> Saint Nicholas the Wonderworker',
+    '"воздвижению Креста Господня" -> Exaltation of the Cross',
+    '',
+    'If it is a general canon to the Lord, the Theotokos, or the Holy Trinity',
+    '(not a specific saint, feast, or icon), respond with exactly: GENERAL',
+    '',
+    'Respond with ONLY the English name, nothing else.',
+  ].join('\n');
+}
+
 // Translates the already-generated Russian announcement into English. This
 // is a plain translation task, not a research task — no search grounding
 // needed, so it deliberately does not go through callGemini/runGroundedSearch
@@ -393,6 +419,14 @@ function extractGroundingChunks(candidate) {
 
 function isNegative(text) {
   return NEGATIVE_TOKENS.some((token) => text.trim() === token || text.includes(token));
+}
+
+// Gemini's grounding citations usually carry the site's bare DOMAIN as
+// web.title (e.g. "oca.org"), not the page title. That must never win over
+// the model's own TITLE: line, or the announcement ends up saying
+// "The story of oca.org (in English):".
+function isBareDomain(t) {
+  return /^[a-z0-9-]+(\.[a-z0-9-]+)+$/i.test((t || '').trim());
 }
 
 // Both fetch()'s own URL normalization and the WHATWG URL parser store
@@ -534,7 +568,9 @@ async function runGroundedSearch(apiKey, promptBuilder, options = {}) {
     const toResolve = ordered.slice(0, limit + 2);
     const resolved = await Promise.all(
       toResolve.map(async (c) => ({
-        title: c.web.title || fallbackTitle,
+        // Citation titles are often just the bare domain ("oca.org") —
+        // prefer the model's own TITLE: line in that case.
+        title: (c.web.title && !isBareDomain(c.web.title)) ? c.web.title : (fallbackTitle || c.web.title || ''),
         url: await resolveFinalUrl(c.web.uri),
       }))
     );
@@ -676,6 +712,23 @@ exports.findWikiLink = onCall(
   }
 );
 
+exports.translateDedication = onCall(
+  { secrets: [geminiApiKey], timeoutSeconds: 60 },
+  async (request) => {
+    await requireAdmin(request);
+    const dedication = (request.data && request.data.dedication || '').trim();
+    if (!dedication) {
+      throw new HttpsError('invalid-argument', 'Please provide a canon dedication.');
+    }
+    const data = await callGeminiPlain(
+      geminiApiKey.value(), buildDedicationTranslationPrompt(dedication), 30000
+    );
+    const text = stripCodeFence(extractText(data.candidates && data.candidates[0]))
+      .replace(/^["']|["']$/g, '').trim();
+    return { title: text === 'GENERAL' ? '' : text };
+  }
+);
+
 exports.translateCanonReading = onCall(
   { secrets: [geminiApiKey], timeoutSeconds: 90 },
   async (request) => {
@@ -694,4 +747,3 @@ exports.translateCanonReading = onCall(
     return { html: translated };
   }
 );
-
